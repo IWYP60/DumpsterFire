@@ -1,0 +1,1 @@
+plantsamples <- tbl(connect,"plantsample")

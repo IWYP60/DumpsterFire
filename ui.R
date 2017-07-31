@@ -67,16 +67,42 @@ shinyUI(fluidPage(
       
       
       tabPanel("Plants and Plots",
-               tags$h2("Current Plants and Plots:"),
-               tags$h2("Coming soon..."),
-               tableOutput("tblPlantPlot")),
-      
+              fluidRow(
+                tags$br(),
+                column(2,
+                       textInput("txtPPNameSearch","Search database for:"),
+                       actionButton("btnPPSearch","Search")),
+                column(2,
+                       uiOutput("uiPlantPlotSelect"),
+                       checkboxInput("PPExtendedCheck", "Extended Results", value = FALSE)),
+                column(2,
+                       tags$br(),
+                       downloadButton("btnPPDL","Download"))
+              ),
+              tableOutput("tblPP"),
+              tags$br()),
       
       tabPanel("Samples",
+               fluidRow(
+                 tags$br(),
+                 column(2,
+                        textInput("txtSampleNameSearch","Search database for:"),
+                        actionButton("btnSampleSearch","Search")),
+                 column(2,
+                        uiOutput("uiSampleSelect"),
+                        checkboxInput("SampleExtendedCheck", "Extended Results", value = FALSE)),
+                 column(2,
+                        tags$br(),
+                        downloadButton("btnSampleDL","Download"))
+               ),
+               tableOutput("tblSample"),
+               tags$br()),
+      
+      tabPanel("Phenotypes",
                tags$h2("Current Samples:"),
                tags$h2("Coming soon..."),
-               tableOutput("tblSamples")),
-      tabPanel("Load Data", tags$h2("Coming soon..."))
+               tableOutput("tblPheno")),
+      tabPanel("Load Data", tags$h2("Coming soon... NO TOUCHY! >:("))
     )
   )
 ))
