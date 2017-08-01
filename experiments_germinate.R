@@ -3,7 +3,7 @@ experiments <- tbl(connect,"experiments")
 
 expFields <- reactive({
   if (input$expExtendedCheck) { 
-    expColz <- "plantplot.*,experiments.experiment_name"
+    expColz <- "plantplot.id, plantplot.number, plantplot.name, germinatebase.name AS accession, site_name, experimentdesign.name, plantplot_position, seriesname AS fieldtrial, plantplot.created_on, plantplot.updated_on"
   }
   else{
     expColz <- paste0("plantplot.number,plantplot.name,plantplot.created_on,experiments.experiment_name")
@@ -35,7 +35,12 @@ expQueryConstruct <- reactive({
   }
   
   expmakeQuery <- NULL
-  expmakeQuery <- paste0("SELECT ", expFields()," FROM plantplot INNER JOIN experimentdesign ON (plantplot.experimentdesign_id = experimentdesign.id) INNER JOIN experiments ON (experimentdesign.experiments_id = experiments.id) ",expWhere)
+  expmakeQuery <- paste0("SELECT ", expFields()," FROM plantplot
+                         LEFT JOIN experimentdesign ON (plantplot.experimentdesign_id = experimentdesign.id)
+                         LEFT JOIN experiments ON (experimentdesign.experiments_id = experiments.id)
+                         LEFT JOIN germinatebase ON (plantplot.germinatebase_id = germinatebase.id)
+                         LEFT JOIN locations ON (plantplot.locations_id = locations.id)
+                         LEFT JOIN trialseries ON (plantplot.trialseries_id = trialseries.id) ",expWhere)
   
   output$txtQuery <- renderText({expmakeQuery})
   

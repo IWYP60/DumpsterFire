@@ -86,14 +86,15 @@ shinyUI(fluidPage(
                fluidRow(
                  tags$br(),
                  column(2,
-                        textInput("txtSampleNameSearch","Search database for:"),
-                        actionButton("btnSampleSearch","Search")),
+                        textInput("txtSampNameSearch","Search database for:"),
+                        actionButton("btnSampSearch","Search")),
                  column(2,
                         uiOutput("uiSampleSelect"),
-                        checkboxInput("SampleExtendedCheck", "Extended Results", value = FALSE)),
+                        uiOutput("uiSampleType"),
+                        checkboxInput("sampExtendedCheck", "Extended Results", value = FALSE)),
                  column(2,
                         tags$br(),
-                        downloadButton("btnSampleDL","Download"))
+                        downloadButton("btnSampDL","Download"))
                ),
                tableOutput("tblSample"),
                tags$br()),

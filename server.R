@@ -10,6 +10,8 @@ shinyServer(function(input, output,session) {
    
   connect <- DBI::dbConnect(RMySQL::MySQL(), host = "127.0.0.1", user = "iwyp60ro", db = "iwyp60_germinate_test")
   
+  # connect <- DBI::dbConnect(RMySQL::MySQL(), host = "130.56.33.112", user = "iwyp60ro", db = "iwyp60_germinate_test")
+  
   source("accession_germinate.R", local=T)
   
   source("plantplot_germinate.R", local=T)
