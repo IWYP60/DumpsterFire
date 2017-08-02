@@ -21,7 +21,11 @@ shinyServer(function(input, output,session) {
   source("plantsamples_germinate.R",local=T)
 
   
-  # field <- reactive(input$fieldSelect)
+  # NB: when combining two lists to show a display different to a value in a selectInput
+  
+  # use "split(value,label)"!
+  
+  # This will display a label different to the value returned by the selectInput
 
   
   countCalculator <- function(sourceText,sourceTable){

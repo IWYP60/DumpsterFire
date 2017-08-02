@@ -23,7 +23,7 @@ shinyUI(fluidPage(
   textOutput("txtPlantSummary"),
   textOutput("txtSampleSummary"),
   tags$br(),
-  tags$h4("Current Query:"),
+  checkboxInput("displayQuery", "Display SQL Query (NON-FUNCTIONAL!)",value=F),
   textOutput("txtQuery"),
   tags$br(),
   

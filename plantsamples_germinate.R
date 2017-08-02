@@ -8,7 +8,7 @@ sampFields <- reactive({
     plantsample.weight, plantsample.sampled_on, plantsample.details, plantsample.created_on, plantsample.updated_on"
   }
   else{
-    sampColz <- paste0("plantsample.name, parentsample.name AS parentsample, plantplot.name AS plantname, tissue.name AS tissue,
+    sampColz <- paste0("plantsample.name, parentsample.name AS parentsample, plantplot.number AS plantplot_number, plantplot.name AS plantname, tissue.name AS tissue,
                        samplestage.name AS growthstage,experimenttypes.description AS samplepurpose, plantsample.created_on")
   }
   return(sampColz)
@@ -24,7 +24,7 @@ output$uiSampleSelect<- renderUI({
   else{
     fieldChoices <- strsplit(sampFields(),",")[[1]]
   }
-  selectInput("sampFieldSelect", "Search Column:", choices = fieldChoices, multiple = F, selected = "name")
+  selectInput("sampFieldSelect", "Search Column:", choices = fieldChoices, multiple = F, selected = "plantsample.name")
 })
 
 
@@ -41,12 +41,14 @@ sampSearchName <- eventReactive(input$btnSampSearch,{
 sampQueryConstruct <- reactive({
   ordering <- ""
   
-  if (sampSearchName() == ""){
-    ordering <- "plantsample.name"
-  }
-  else{
-    ordering <- input$sampFieldSelect  
-  }
+  # if (sampSearchName() == ""){
+  #   ordering <- "plantsample.name"
+  # }
+  # else{
+  #   ordering <- input$sampFieldSelect  
+  # }
+  
+  ordering <- "plantsample.name"
   
   if (regexpr("AS", ordering)[1] != -1){
     ordering <- substr(ordering, 1, ((regexpr("AS", ordering)[1])-2))  

@@ -29,14 +29,14 @@ PPQueryConstruct <- reactive({
     ordering <- input$PPSelect  
   }
   
-  
   PPBuildQuery <- paste0("SELECT ",PPFields()," FROM plantplot WHERE ",input$PPSelect," LIKE \"",paste0("%",PPSearchName(),"%"),"\" ORDER BY ", ordering)
-  
-  
+
   output$txtQuery <- renderText({PPBuildQuery})
+  
   return(PPBuildQuery)
   
 })
+
 
 
 PPQuery <- reactive({
