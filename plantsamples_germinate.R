@@ -39,7 +39,7 @@ sampSearchName <- eventReactive(input$btnSampSearch,{
 
 
 sampQueryConstruct <- reactive({
-  ordering <- ""
+  # ordering <- ""
   
   # if (sampSearchName() == ""){
   #   ordering <- "plantsample.name"

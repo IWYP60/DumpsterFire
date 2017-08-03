@@ -21,14 +21,21 @@ PPSearchName <- eventReactive(input$btnPPSearch,{
 
 
 PPQueryConstruct <- reactive({
-  ordering <- ""
+  # ordering <- ""
+  # 
+  # if (PPSearchName() == ""){
+  #   ordering <- "plantplot.number"
+  # }
+  # else{
+  #   ordering <- input$PPSelect  
+  # }
+  # 
+  ordering <- input$PPSelect
   
-  if (PPSearchName() == ""){
-    ordering <- "number"
+  if (regexpr("AS", ordering)[1] != -1){
+    ordering <- substr(ordering, 1, ((regexpr("AS", ordering)[1])-2))  
   }
-  else{
-    ordering <- input$PPSelect  
-  }
+  
   
   PPBuildQuery <- paste0("SELECT ",PPFields()," FROM plantplot
                          LEFT JOIN germinatebase ON (plantplot.germinatebase_id = germinatebase.id)
@@ -36,7 +43,7 @@ PPQueryConstruct <- reactive({
                          LEFT JOIN experimentdesign ON (plantplot.experimentdesign_id = experimentdesign.id)
                          LEFT JOIN experiments ON (experimentdesign.experiments_id= experiments.id)
                          LEFT JOIN trialseries ON (plantplot.trialseries_id = trialseries.id) 
-                         WHERE ",input$PPSelect," LIKE \"",paste0("%",PPSearchName(),"%"),"\" ORDER BY ", ordering)
+                         WHERE ",ordering," LIKE \"",paste0("%",PPSearchName(),"%"),"\" ORDER BY ", ordering)
 
   output$txtQuery <- renderText({PPBuildQuery})
   
