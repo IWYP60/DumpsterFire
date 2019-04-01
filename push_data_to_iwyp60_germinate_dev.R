@@ -1,5 +1,5 @@
-## connecting to databases
-## check out https://db.rstudio.com/dplyr/
+## R code to connect and interface with IWYP60 Germinate database
+## Theoretically, the final version will be used to upload collated & processed data to IWYP60 germinate
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation

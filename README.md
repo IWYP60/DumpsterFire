@@ -9,4 +9,5 @@ Location for storing scripts and workflows around the collation and integration 
 ### old_python
 This directory contains old python scripts written by Darren C to interface with IWYP60 Germinate database.
 
-
+### quack_dir
+This directory contains scripts pulled from https://github.com/quacksawbones/germinate_extension
