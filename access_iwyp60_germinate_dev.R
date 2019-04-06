@@ -4,9 +4,8 @@
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
 library(rstudioapi)
-library(tidyverse)
 
-## connect to database
+## generate DBI COnnection Object / establish connection with database
 con <- dbConnect(MySQL(),
           dbname="iwyp60_germinate_dev",
           host = 'wheatyield.anu.edu.au',
@@ -14,24 +13,14 @@ con <- dbConnect(MySQL(),
 
 ## list tables in database
 table_names <- dbListTables(con)
-table_names
 
 ## read data from table
 tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
 
 ## give tables names to make calling specific table easier
 names(tables) <- table_names
-i <- "datasets"
-head(tables[i])
-tail(tables[i])
+head(tables["compounddata"])
 
-##
-#### collate Prot data
-iwyp_dir <- "iwyp60_data/"
-dir(iwyp_dir)
-
-## append df to an existing table
-sqlAppendTableTemplate(con, table = i, df)
 
 ## disconnect from database
 dbDisconnect(con)
