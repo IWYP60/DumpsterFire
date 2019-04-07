@@ -5,33 +5,46 @@ library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
 library(rstudioapi)
 library(tidyverse)
+library(xlsx)
+
+##
+#### collate data
+iwyp_dir <- "iwyp60_data/"
+csv_fls <- dir(iwyp_dir, "csv")
+xlsx_fls <- dir(iwyp_dir, "xlsx")
+
+yr <- unique(sapply(strsplit(csv_fls, "_"), function(l) l[1]))
+sites <- unique(sapply(strsplit(csv_fls, "_"), function(l) l[2]))
+measures <- unique(sapply(strsplit(csv_fls, "_"), function(l) l[3]))
+print(c(yr,sites,measures))
+
+files <- dir(iwyp_dir, pattern = measures[1])
+
+df <- data_frame(files) %>% mutate(contents = map(., ~ read_csv(file.path(iwyp_dir, .)))) %>% unnest %>% 
+  mutate(Site = sapply(strsplit(files, "_"), function(l) l[2])) %>% select(-files)
+df <- as.data.frame(df)
+head(df)
 
 ## connect to database
 con <- dbConnect(MySQL(),
-          dbname="iwyp60_germinate_dev",
-          host = 'wheatyield.anu.edu.au',
-          password = askForPassword())
+                 dbname="iwyp60_germinate_dev",
+                 host = 'wheatyield.anu.edu.au',
+                 password = askForPassword())
 
-## list tables in database
-table_names <- dbListTables(con)
-table_names
+## list database tables
+dbListTables(con)
 
-## read data from table
-tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
+## create test table
+dbCreateTable(conn = con, name = "test", fields = df)
 
-## give tables names to make calling specific table easier
-names(tables) <- table_names
-i <- "datasets"
-head(tables[i])
-tail(tables[i])
+## append data to table
+dbWriteTable(conn = con, name = 'test', value = df, row.names = NA, append = TRUE)
 
-##
-#### collate Prot data
-iwyp_dir <- "iwyp60_data/"
-dir(iwyp_dir)
+## test table
+dbReadTable(con, 'test')
 
-## append df to an existing table
-sqlAppendTableTemplate(con, table = i, df)
+## remove test table
+dbRemoveTable(conn = con, name = "test")
 
 ## disconnect from database
 dbDisconnect(con)

@@ -13,14 +13,16 @@ con <- dbConnect(MySQL(),
 
 ## list tables in database
 table_names <- dbListTables(con)
+table_names
 
 ## read data from table
 tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
 
 ## give tables names to make calling specific table easier
 names(tables) <- table_names
-head(tables["compounddata"])
-
+i <- "test"
+head(tables[i])
+tail(tables[i])
 
 ## disconnect from database
 dbDisconnect(con)
