@@ -31,6 +31,9 @@ con <- dbConnect(MySQL(),
                  host = 'wheatyield.anu.edu.au',
                  password = askForPassword())
 
+####
+### create "test" table, append climate data to it, read table, then drop table.
+
 ## list database tables
 dbListTables(con)
 
@@ -40,7 +43,7 @@ dbCreateTable(conn = con, name = "test", fields = df)
 ## append data to table
 dbWriteTable(conn = con, name = 'test', value = df, row.names = NA, append = TRUE)
 
-## test table
+## read/view  test table
 dbReadTable(con, 'test')
 
 ## remove test table
