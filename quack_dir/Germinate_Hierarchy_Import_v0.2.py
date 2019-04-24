@@ -1,3 +1,6 @@
+## install
+# pip2.7 install pandas, sqlalchemy, MySQL-python
+
 import pandas as pd
 from sqlalchemy import Column, Integer, String, ForeignKey, and_
 from sqlalchemy.orm import sessionmaker
@@ -15,7 +18,6 @@ engine_str = "mysql://iwyp60:<password>@<server>:3306/iwyp60_germinate_dev"
 engine = create_engine(engine_str, echo=False, isolation_level="READ UNCOMMITTED")
 
 Base = declarative_base()
-
 
 processAccession = False
 processPlantPlot = False
@@ -192,10 +194,7 @@ class Attributes(Base):
         return "<Subtaxa(name='%s', description='%d', datatype='%s', target_table='%s',created_on='%s')>" % \
                 (self.name, self.description, self.datatype, self.target_table, self.created_on)
                 
-
-
-
-sample_tracking = pd.ExcelFile("/data/temp/IWYP60_EUE_Draft_Sample_Tracking_20180605_SHP_copy.xlsx")    
+sample_tracking = pd.ExcelFile("/home/diepg/iwyp60_scripts/sample_info/IWYP60_EUE_Draft_Sample_Tracking_20190108_AB.xlsx")    
     
 Session = sessionmaker(bind=engine)    
 
@@ -203,38 +202,27 @@ connection = engine.connect()
 
 session = Session(bind=connection)
 
-
-
-
-
 if processAccession:
     
     print "Loading Accession data, ignoring existing entries"
     sample_tracking_accession = sample_tracking.parse("Accession")
     
-    
-    
     for accrow in sample_tracking_accession.itertuples(index=True, name='Accession'):
         
-        acc_existing_query=session.query(GerminateBase.id).filter(GerminateBase.general_identifier == getattr(accrow, "Accession_ID"))
+	acc_existing_query=session.query(GerminateBase.id).filter(GerminateBase.general_identifier == getattr(accrow, "Accession_ID"))
         acc_existing_result=session.execute(acc_existing_query).scalar()
         
         if acc_existing_result:
             next
         else:
 
-
-                
-            #acc_notes = "%s%s%s%s%s%s%s%s%s%s%s%s" % (acc_cross, acc_pedigree, acc_source, acc_cid, acc_sid, acc_gid, acc_oid, acc_altname1, acc_altname2, acc_altname3, acc_altid, acc_onotes)
-            acc = GerminateBase(general_identifier=getattr(accrow, "Accession_ID"), number=getattr(accrow, "Accession_ID"), name=getattr(accrow, "Accession_name"), entitytype_id = 1, biologicalstatus_id=400, taxonomy_id=1, created_on=datetime.datetime.now())#, notes=acc_notes)
+#acc_notes = "%s%s%s%s%s%s%s%s%s%s%s%s" % (acc_cross, acc_pedigree, acc_source, acc_cid, acc_sid, acc_gid, acc_oid, acc_altname1, acc_altname2, acc_altname3, acc_altid, acc_onotes)
+    acc = GerminateBase(general_identifier=getattr(accrow, "Accession_ID"), number=getattr(accrow, "Accession_ID"), name=getattr(accrow, "Accession_name"), entitytype_id = 1, biologicalstatus_id=400, taxonomy_id=1, created_on=datetime.datetime.now())#, notes=acc_notes)
             session.add(acc)
-            
-        #    NB: Country of Origin will need to go into notes... Unless there is another way of doign it?
-    
-    
+          
+#NB: Country of Origin will need to go into notes... Unless there is another way of doign it?
     print ('%d accession entries added to Germinate') % len(session.new)
     session.commit()
-
 
 if processAccession:
     
@@ -317,8 +305,7 @@ if processAccession:
                 acc_sid = AttributeData(attribute_id = 5, foreign_id = acc_existing_result, value = sid, created_on=datetime.datetime.now())
                 session.add(acc_sid)
 
-
-        if not (pd.isnull(getattr(accrow, "GID"))):
+       if not (pd.isnull(getattr(accrow, "GID"))):
 
             gid = getattr(accrow, "GID")
             acc_existing_query=session.query(GerminateBase.id).filter(GerminateBase.general_identifier == getattr(accrow, "Accession_ID"))
@@ -743,8 +730,6 @@ if processGrain:
         
     print ('%d GrainPacket entries added to Germinate') % len(session.new)
     session.commit()
-
-
 
 print("Import Complete")
 
