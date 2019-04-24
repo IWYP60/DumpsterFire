@@ -9,73 +9,57 @@ from sqlalchemy import create_engine
 import logging
 import datetime
 
-
 logging.basicConfig()
 #logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
-engine_str = "mysql://iwyp60:<password>@<server>:3306/iwyp60_germinate_dev"
-
+engine_str = "mysql://iwyp60:iwypservers@localhost:3306/iwyp60_germinate_dev"
 engine = create_engine(engine_str, echo=False, isolation_level="READ UNCOMMITTED")
-
 Base = declarative_base()
-
 processAccession = False
 processPlantPlot = False
 processExperiments = False
 processSamples = True
 processGrain = False
-
 loadQ2Data = False
 
-
 if processExperiments:
-
-    class Experiments(Base):
-        __tablename__ = 'experiments'
-    
-        id = Column(Integer, primary_key=True)    
-        experiment_name = Column(String)
-        user_id = Column(String)
-        description = Column(String)
-        experiment_date = Column(String)
-        #experiment_type_id = Column(Integer,ForeignKey("experimenttypes.id"))
-        experiment_type_id = Column(Integer)
-        created_on = Column(String)
-        updated_on = Column(String)
-    
-        def __repr__(self):
-            return "<Experiments(experiment_name='%s', user_id='%s', description='%s',experiment_date='%s', experiment_type_id='%d', created_on='%s')>" %\
-                    (self.experiment_name, self.user_id, self.description, self.experiment_date, self.experiment_type_id, self.created_on)
-
-
+	class Experiments(Base):
+        	__tablename__ = 'experiments'
+        	id = Column(Integer, primary_key=True)    
+	        experiment_name = Column(String)
+	        user_id = Column(String)
+	        description = Column(String)
+	        experiment_date = Column(String)
+	        #experiment_type_id = Column(Integer,ForeignKey("experimenttypes.id"))
+	        experiment_type_id = Column(Integer)
+	        created_on = Column(String)
+	        updated_on = Column(String)
+	        def __repr__(self):
+        		    return "<Experiments(experiment_name='%s', user_id='%s', description='%s',experiment_date='%s', experiment_type_id='%d', created_on='%s')>" %\
+              			  (self.experiment_name, self.user_id, self.description, self.experiment_date, self.experiment_type_id, self.created_on)
 
 if any([processAccession,processPlantPlot,processSamples,processGrain]):
-
-    class EntityType(Base):
-        __tablename__ = 'entitytype'
-        
-        id = Column(Integer, primary_key=True)
-        name = Column(String)
-        description = Column(String)
-        created_on = Column(String)
-        updated_on = Column(String)
-            
-        def __repr__(self):
-            return "<Entities(Name='%s', description='%s', created_on='%s')>" % (self.name, self.description, self.created_on)
+	class EntityType(Base):
+		__tablename__ = 'entitytype'
+        	id = Column(Integer, primary_key=True)
+        	name = Column(String)
+        	description = Column(String)
+        	created_on = Column(String)
+        	updated_on = Column(String)
+        	def __repr__(self):
+            		return "<Entities(Name='%s', description='%s', created_on='%s')>" % (self.name, self.description, self.created_on)
     
-    
-    #Should happen with ANY process flag
-    
-    class GerminateBase(Base):
-        __tablename__ = 'germinatebase'
-        
-        id = Column(Integer, primary_key=True)
-        general_identifier = Column(String)
-        number = Column(String)
-        name = Column(String)
-        bank_number = Column(String)
-        breeders_code = Column(String)
-        taxonomy_id = Column(Integer,ForeignKey("taxonomies.id"))
+#Should happen with ANY process flag
+	
+class GerminateBase(Base):
+       	__tablename__ = 'germinatebase'
+       	id = Column(Integer, primary_key=True)
+       	general_identifier = Column(String)
+       	number = Column(String)
+       	name = Column(String)
+       	bank_number = Column(String)
+	breeders_code = Column(String)
+       	taxonomy_id = Column(Integer,ForeignKey("taxonomies.id"))
         subtaxa_id = Column(Integer,ForeignKey("subtaxa.id"))
         #NB: While institution_id is a foreign key, this can be updated in the DB later on...
         institution_id = Column(Integer)
@@ -83,55 +67,42 @@ if any([processAccession,processPlantPlot,processSamples,processGrain]):
         donor_code = Column(Integer)
         donor_number = Column(String)
         acqdate = Column(String)
-        collnumb = Column(String)
-        colldate = Column(String)
-        collcode = Column(Integer)
-        duplsite = Column(String)
-        #NB: While biologicalstatus_id is a foreign key, this can be updated in the DB later on...
-        biologicalstatus_id = Column(Integer)
-        entityparent_id = Column(Integer)
-        entitytype_id = Column(Integer)
-        collsrc_id = Column(Integer)      
-        #NB: While location_id is a foreign key, this can be updated in the DB later on...
-        location_id = Column(Integer)
+	collnumb = Column(String)
+	colldate = Column(String)
+	collcode = Column(Integer)
+	duplsite = Column(String)
+	#NB: While biologicalstatus_id is a foreign key, this can be updated in the DB later on...
+	biologicalstatus_id = Column(Integer)
+	entityparent_id = Column(Integer)
+	entitytype_id = Column(Integer)
+	collsrc_id = Column(Integer)      
+	#NB: While location_id is a foreign key, this can be updated in the DB later on...
+	location_id = Column(Integer)
         created_on = Column(String)
         updated_on = Column(String)
-               
         def __repr__(self):
-            return "<GerminateBase(general_identifier='%s', number='%s', name='%s', taxonomy_id='%d', biologicalstatus_id='%d', collsrc_id='%d' notes='%s', self.created_on='%s')>" % \
-                    (self.general_identifier, self.number, self.name, self.taxonomy_id, self.biologicalstatus_id, self.entityparent_id, self.collsrc_id, self.notes, self.created_on)
+		return "<GerminateBase(general_identifier='%s', number='%s', name='%s', taxonomy_id='%d', biologicalstatus_id='%d', collsrc_id='%d' notes='%s', self.created_on='%s')>" % \
+                	(self.general_identifier, self.number, self.name, self.taxonomy_id, self.biologicalstatus_id, self.entityparent_id, self.collsrc_id, self.notes, self.created_on)
     
-                
-    
-    class Locations(Base):
-        __tablename__ = 'locations'
-        
+class Locations(Base):
+       	__tablename__ = 'locations'
         id = Column(Integer, primary_key=True)
-        site_name = Column(String)
-        created_on = Column(String)
-          
+       	site_name = Column(String)
+      	created_on = Column(String)
         def __repr__(self):
-            return "<Trial_Series(seriesname='%s'), created_on='%s')>" % (self.seriesname, self.created_on)    
-        
-        
-        
-    class Trial_Series(Base):
-        __tablename__ = 'trialseries'
-        
+		return "<Trial_Series(seriesname='%s'), created_on='%s')>" % (self.seriesname, self.created_on)    
+             
+class Trial_Series(Base):
+       	__tablename__ = 'trialseries'
         id = Column(Integer, primary_key=True)
-        seriesname = Column(String)
-        created_on = Column(String)
-        updated_on = Column(String)
-        
+       	seriesname = Column(String)
+       	created_on = Column(String)
+       	updated_on = Column(String)
         def __repr__(self):
-            return "<Trial_Series(seriesname='%s'), created_on='%s')>" % (self.seriesname, self.created_on)
-        
-    
-
+		return "<Trial_Series(seriesname='%s'), created_on='%s')>" % (self.seriesname, self.created_on)
    
-    class Taxa(Base):
-        __tablename__ = 'taxonomies'
-        
+class Taxa(Base):
+       	__tablename__ = 'taxonomies'
         id = Column(Integer, primary_key=True)
         genus = Column(String)
         species = Column(String)
@@ -140,62 +111,50 @@ if any([processAccession,processPlantPlot,processSamples,processGrain]):
         ploidy = Column(Integer)
         created_on = Column(String)
         updated_on = Column(String)
-        
         def __repr__(self):
-            return "<Taxa(genus='%s', species='%s', species_author='%s',cropname='%s', ploidy='%d', created_on='%s')>" % \
-                    (self.genus, self.species, self.species_author, self.cropname, self.ploidy, self.created_on)
-    
-    
-    
-    class Subtaxa(Base):
-        __tablename__ = 'subtaxa'
-        
-        id = Column(Integer, primary_key=True)
-        taxonomy_id = Column(Integer,ForeignKey("taxonomies.id"))
-        subtaxa_author = Column(String)
-        taxonomic_identifier = Column(String)
-        created_on = Column(String)
-        updated_on = Column(String)
-        
-        def __repr__(self):
-            return "<Subtaxa(taxonomy_id='%d', subtaxa_author='%s', taxonomic_identifier='%s',created_on='%s')>" % \
-                    (self.taxonomy_id, self.subtaxa_author, self.taxonomic_identifier, self.created_on) 
-    
-    #NB: This is here so that the data file is loaded ONLY if Accession processing is on the list.
+        	return "<Taxa(genus='%s', species='%s', species_author='%s',cropname='%s', ploidy='%d', created_on='%s')>" % \
+                	(self.genus, self.species, self.species_author, self.cropname, self.ploidy, self.created_on)
+
+class Subtaxa(Base):
+       	__tablename__ = 'subtaxa'
+       	id = Column(Integer, primary_key=True)
+       	taxonomy_id = Column(Integer,ForeignKey("taxonomies.id"))
+       	subtaxa_author = Column(String)
+       	taxonomic_identifier = Column(String)
+       	created_on = Column(String)
+       	updated_on = Column(String)
+       	def __repr__(self):
+        	return "<Subtaxa(taxonomy_id='%d', subtaxa_author='%s', taxonomic_identifier='%s',created_on='%s')>" % \
+                	(self.taxonomy_id, self.subtaxa_author, self.taxonomic_identifier, self.created_on) 
+#NB: This is here so that the data file is loaded ONLY if Accession processing is on the list.
 
 class AttributeData(Base):
-    __tablename__ = 'attributedata'
-    
-    id = Column(Integer, primary_key=True)
-    attribute_id = Column(Integer,ForeignKey("attributes.id"))
-    foreign_id = Column(Integer) #NB: not a TRUE Foreign Key. More like a reference to another table index
-    value = Column(String)
-    created_on = Column(String)
-    updated_on = Column(String)
-    
-    def __repr__(self):
-        return "<Subtaxa(attribute_id='%d', foreign_id='%d', value='%s',created_on='%s')>" % \
-                (self.attribute_id, self.foreign_id, self.value, self.created_on)
-
-                
+	__tablename__ = 'attributedata'
+    	id = Column(Integer, primary_key=True)
+	attribute_id = Column(Integer,ForeignKey("attributes.id"))
+	foreign_id = Column(Integer) #NB: not a TRUE Foreign Key. More like a reference to another table index
+	value = Column(String)
+	created_on = Column(String)
+	updated_on = Column(String)
+      	def __repr__(self):
+  		return "<Subtaxa(attribute_id='%d', foreign_id='%d', value='%s',created_on='%s')>" % \
+	       		(self.attribute_id, self.foreign_id, self.value, self.created_on)
 
 class Attributes(Base):
-    __tablename__ = 'attributes'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    description = Column(String)
-    datatype = Column(String) #NB: FIXED LIST - INT, FLOAT, CHAR
-    target_table = Column(String)
-    created_on = Column(String)
-    updated_on = Column(String)
-    
-    def __repr__(self):
-        return "<Subtaxa(name='%s', description='%d', datatype='%s', target_table='%s',created_on='%s')>" % \
-                (self.name, self.description, self.datatype, self.target_table, self.created_on)
+	__tablename__ = 'attributes'
+	id = Column(Integer, primary_key=True)
+	name = Column(String)
+	description = Column(String)
+	datatype = Column(String) #NB: FIXED LIST - INT, FLOAT, CHAR
+	target_table = Column(String)
+	created_on = Column(String)
+	updated_on = Column(String)
+    	def __repr__(self):
+        	return "<Subtaxa(name='%s', description='%d', datatype='%s', target_table='%s',created_on='%s')>" % \
+                	(self.name, self.description, self.datatype, self.target_table, self.created_on)
                 
 sample_tracking = pd.ExcelFile("/home/diepg/iwyp60_scripts/sample_info/IWYP60_EUE_Draft_Sample_Tracking_20190108_AB.xlsx")    
-    
+
 Session = sessionmaker(bind=engine)    
 
 connection = engine.connect()
@@ -203,22 +162,19 @@ connection = engine.connect()
 session = Session(bind=connection)
 
 if processAccession:
-    
     print "Loading Accession data, ignoring existing entries"
     sample_tracking_accession = sample_tracking.parse("Accession")
     
     for accrow in sample_tracking_accession.itertuples(index=True, name='Accession'):
-        
-	acc_existing_query=session.query(GerminateBase.id).filter(GerminateBase.general_identifier == getattr(accrow, "Accession_ID"))
+        acc_existing_query=session.query(GerminateBase.id).filter(GerminateBase.general_identifier == getattr(accrow, "Accession_ID"))
         acc_existing_result=session.execute(acc_existing_query).scalar()
         
         if acc_existing_result:
             next
         else:
-
 #acc_notes = "%s%s%s%s%s%s%s%s%s%s%s%s" % (acc_cross, acc_pedigree, acc_source, acc_cid, acc_sid, acc_gid, acc_oid, acc_altname1, acc_altname2, acc_altname3, acc_altid, acc_onotes)
-    acc = GerminateBase(general_identifier=getattr(accrow, "Accession_ID"), number=getattr(accrow, "Accession_ID"), name=getattr(accrow, "Accession_name"), entitytype_id = 1, biologicalstatus_id=400, taxonomy_id=1, created_on=datetime.datetime.now())#, notes=acc_notes)
-            session.add(acc)
+		acc = GerminateBase(general_identifier=getattr(accrow, "Accession_ID"), number=getattr(accrow, "Accession_ID"), name=getattr(accrow, "Accession_name"), entitytype_id = 1, biologicalstatus_id=400, taxonomy_id=1, created_on=datetime.datetime.now())#, notes=acc_notes)
+            	session.add(acc)
           
 #NB: Country of Origin will need to go into notes... Unless there is another way of doign it?
     print ('%d accession entries added to Germinate') % len(session.new)
