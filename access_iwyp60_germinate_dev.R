@@ -20,9 +20,12 @@ tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
 
 ## give tables names to make calling specific table easier
 names(tables) <- table_names
+
+i <- "compounds"
+head(tables[[i]])
+
 i <- "compounddata"
-head(tables[i])
-tail(tables[i])
+head(tables[[i]])
 
 ## disconnect from database
 dbDisconnect(con)
