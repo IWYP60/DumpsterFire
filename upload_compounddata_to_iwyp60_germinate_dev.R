@@ -1,5 +1,5 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## Theoretically, the final version will be used to upload collated & processed data to IWYP60 germinate
+## This script collates proteomic data and uploads to the compounddata table to the germinate3 database
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
@@ -71,7 +71,7 @@ df_locations <- left_join(df, locations, by=c('site_name')) %>%
 
 datasets <- tables[["datasets"]]
 
-df_datasets <- tibble(id=1) %>% 
+df_datasets <- tibble(dataset_id=1) %>% 
   mutate(experiment_id = df_exps$experiment_id) %>%
   mutate(location_id = df_locations$location_id) %>%
   mutate(description = "2016 CIMMYT Proteomics Functional Bin") %>%
@@ -85,18 +85,23 @@ df_cmp <- left_join(df, cmp, by=c('func_bin' = 'name')) %>%
   mutate(compound_id = id) %>%
   select(compound_id, func_bin, compound_class) %>% unique
 
-##
-
+###
 cmpdata <- tables[["compounddata"]]
 
 df_cmpdata <- full_join(df, df_exps, by='description') %>%
   full_join(df_germbase, by='sample_id') %>%
   full_join(df_locations, by='site_name') %>%
-  full_join(df_cmp, by='func_bin')
+  full_join(df_cmp, by='func_bin') %>%
+  full_join(df_datasets, by='experiment_id') %>%
+  select(compound_id, germinatebase_id, dataset_id, compound_value)
 
 
-## append data to table
-dbWriteTable(conn = con, name = 'test', value = df, row.names = NA, append = TRUE)
+####
+####
+## APPEND DATA TO TABLE
+dbWriteTable(conn = con, name = 'compounddata', value = df_cmpdata, row.names = NA, append = TRUE)
+
+test <- dbReadTable(name = "compounddata", conn=con)
 
 ## disconnect from database
 dbDisconnect(con)
