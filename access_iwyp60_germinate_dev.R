@@ -1,9 +1,11 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## Theoretically, the final version will be used to upload collated & processed data to IWYP60 germinate
+## This script sets a template for accessing database information but NOT editing info
+## Useful for read-only accounts
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
 library(rstudioapi)
+library(tidyverse)
 
 ## generate DBI COnnection Object / establish connection with database
 con <- dbConnect(MySQL(),

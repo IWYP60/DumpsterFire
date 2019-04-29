@@ -5,7 +5,6 @@ library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
 library(rstudioapi)
 library(tidyverse)
-library(xlsx)
 
 ##
 #### collate data
@@ -20,7 +19,11 @@ print(c(yr,sites,measures))
 ##
 #### Proteomic data
 ##
-files <- dir(iwyp_dir, pattern = measures[4])
+
+traits <- measures[c(4)]
+cat("To import:", paste(traits))
+
+files <- dir(iwyp_dir, pattern = traits)
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -95,12 +98,12 @@ df_cmpdata <- full_join(df, df_exps, by='description') %>%
   full_join(df_datasets, by='experiment_id') %>%
   select(compound_id, germinatebase_id, dataset_id, compound_value)
 
-
 ####
 ####
 ## APPEND DATA TO TABLE
 dbWriteTable(conn = con, name = 'compounddata', value = df_cmpdata, row.names = NA, append = TRUE)
 
+## check updated table
 test <- dbReadTable(name = "compounddata", conn=con)
 
 ## disconnect from database
