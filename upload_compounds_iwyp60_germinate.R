@@ -24,7 +24,9 @@ dat <- subset(csv_fls, description %in% traits) %>%
   select(description, metabolite, func_bin, peptide) %>%
   gather(compound_class, name, -description, na.rm = T) %>%
   mutate(compound_class = sapply(strsplit(description,"-"), function(l) l[2])) %>%
-  mutate(description = sapply(strsplit(description,"-"), function(l) l[1]))
+  mutate(description = sapply(strsplit(description,"-"), function(l) l[1])) %>%
+  mutate(name = sub(pattern = " Elke", x = name, replacement = '')) %>% # remove " Elke"
+  mutate(name = sub(pattern = " new", x = name, replacement = '')) # remove " new"
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -42,11 +44,6 @@ cmp <- tables[["compounds"]]
 
 #### Remove compounds already in cmp table
 new_dat <- subset(dat, !(name %in% cmp$name))
-
-### potentially need to remove " Elke" or " Elke new"  from compound names
-# test2 <- sub(pattern = " Elke", x = test$name, replacement = '')
-# subset(test, name == "(-)- Shikimic acid (4TMS) Elke new")
-# test2[99]
 
 ####
 ####
