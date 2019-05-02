@@ -18,14 +18,13 @@ con <- dbConnect(MySQL(),
 
 ## get database tables
 table_names <- dbListTables(con)
-tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
+rq_tables <- c("datasets","locations","experiments","datasetstates")
+tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
-names(tables) <- table_names
+names(tables) <- rq_tables
 
-datasets <- tables[["datasets"]]
-locs <- tables[["locations"]]
-exps <- tables[["experiments"]]
-datastate <- tables[["datasetstates"]]
+# datasetstates table
+tables$datasetstates
 
 ### setup datasets table including linking location_id and experiment_id
 dats <- dir(iwyp_dir, "csv") %>% tibble %>% 
@@ -34,8 +33,8 @@ dats <- dir(iwyp_dir, "csv") %>% tibble %>%
   select(-.) %>%
   mutate(site_name_short = sapply(strsplit(description, "_"), function(l) l[2])) %>%
   mutate(site_name_short = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short)) %>% ## assume all GES sites are GES CR04 - need to make better
-  mutate(experiment_id = exps$id[match(site_name_short,exps$description)]) %>% ## add experiment_id = NEED TO EDIT
-  mutate(location_id = locs$id[match(site_name_short, locs$site_name_short)]) %>% ## add location_id
+  mutate(experiment_id = tables$experiments$id[match(site_name_short,tables$experiments$description)]) %>% ## add experiment_id = NEED TO EDIT
+  mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>% ## add location_id
   select(experiment_id, location_id, description, datatype) %>%
   # mutate(created_by = 1) %>% # add created_by id; arbitrary to 1?
   mutate(dataset_state_id = 1) %>% # add dataset_id; 1=public; see datasetstates table
@@ -43,7 +42,7 @@ dats <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(contact = 'andrew.bowerman@anu.edu.au')
 
 ### Remove datasets already existing
-new_dats <- subset(dats, !(description %in% datasets$description))
+new_dats <- subset(dats, !(description %in% tables$datasets$description))
 
 ####
 ####

@@ -36,14 +36,13 @@ con <- dbConnect(MySQL(),
 
 ## get database tables
 table_names <- dbListTables(con)
-tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
+rq_tables <- c("compounds")
+tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
-names(tables) <- table_names
-
-cmp <- tables[["compounds"]]
+names(tables) <- rq_tables
 
 #### Remove compounds already in cmp table
-new_dat <- subset(dat, !(name %in% cmp$name))
+new_dat <- subset(dat, !(name %in% tables$compounds$name))
 
 ####
 ####

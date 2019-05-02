@@ -10,24 +10,22 @@ library(tidyverse)
 ## generate DBI COnnection Object / establish connection with database
 con <- dbConnect(MySQL(),
           dbname="iwyp60_germinate_dev",
-          host = 'wheatyield.anu.edu.au',
-          password = askForPassword())
+          user = "iwyp60ro",
+          host = 'wheatyield.anu.edu.au')
 
-## list tables in database
+## read tables required to pull database info
 table_names <- dbListTables(con)
-table_names
+rq_tables <- c("compounddata", "compounds", "datasets", "experiments", "germinatebase")
+tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 
-## read data from table
-tables <- lapply(FUN=dbReadTable, X=table_names, conn=con)
+## give tables names to make calling specific tables easier
+names(tables) <- rq_tables
 
-## give tables names to make calling specific table easier
-names(tables) <- table_names
-
-i <- "compounds"
-head(tables[[i]])
-
-i <- "compounddata"
-head(tables[[i]])
+df <- select(tables$compounddata, compound_id, germinatebase_id, dataset_id, compound_value) %>%
+  full_join(., tables$compounds, by=c("compound_id"="id")) %>%
+  full_join(., tables$germinatebase, by=c("germinatebase_id"="id")) %>%
+  full_join(., tables$datasets, by=c("dataset_id"="id")) %>%
+  select(-breeders_code, -breeders_name, -subtaxa_id, -puid, -colldate, -collcode, -collname, -collmissid, -othernumb, -duplsite, -duplinstname)
 
 ## disconnect from database
 dbDisconnect(con)
