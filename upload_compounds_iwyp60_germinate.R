@@ -6,7 +6,6 @@ library(RMySQL) ## database implementation
 library(rstudioapi)
 library(tidyverse)
 
-##
 #### collate data
 iwyp_dir <- "iwyp60_data/"
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 

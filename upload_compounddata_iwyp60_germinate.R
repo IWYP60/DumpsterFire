@@ -31,8 +31,8 @@ tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
-#### proteomic data
-## raw file
+#### compounddata = metabolomics & proteomics
+## take import file and assemble necessary columns to upload to compounddata table
 df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
   unnest %>% 
   select(-.,-measures) %>% 
@@ -43,16 +43,14 @@ df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_nam
   mutate(compound_id = tables$compounds$id[match(name, tables$compounds$name)]) %>%
   select(-compound_class, -name) %>%
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
-  mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)])
-
-## gather information required from database tables for import into "df_"
-df_exps <- left_join(df, tables$experiments, by='description') %>%
-  select(id, experiment_name, description) %>% unique %>%
-  mutate(experiment_id = id) %>% select(-id)
-
-df_germbase <- left_join(df, tables$germinatebase, by=c('sample_id' = 'general_identifier')) %>%
-  select(sample_id, id, number, name) %>% unique %>%
-  mutate(germinatebase_id = id) %>% select(-id)
+  mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
+  ## crude substitute of experiment descriptions to match germinate tables
+  mutate(description = sub(pattern = 'Obregon2016', replacement = "CIMMYT2016", x = description)) %>%
+  mutate(description = sub(pattern = 'Obregon2017', replacement = "Obregon2017_PSTails", x = description)) %>%
+  mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>%
+  mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
+  mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
+  select(compound_id, germinatebase_id, dataset_id, compound_value)
 
 ###
 tables$compounddata
