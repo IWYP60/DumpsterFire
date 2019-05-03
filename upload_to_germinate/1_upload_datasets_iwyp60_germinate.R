@@ -35,9 +35,7 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(site_name_short = sapply(strsplit(., "_"), function(l) l[2])) %>%
   ## assume all GES sites are GES CR04 - need to make better !!!!!
   mutate(site_name_short = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short)) %>% 
-  ## add experiment_id
   mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>% 
-  ## add location_id
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>% 
   select(experiment_id, location_id, description, datatype) %>%
   ## andrew is global contract? probably needs edit ...
@@ -46,13 +44,13 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
 ### Remove datasets already existing
 new_dat <- subset(dat, !(interaction(description,datatype) %in% interaction(tables$datasets$description,tables$datasets$datatype)))
 
-####
-####
 ## APPEND DATA TO EXISTING TABLE
 dbWriteTable(conn = con, name = 'datasets', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
 print(dbReadTable(name = "datasets", conn=con))
 
-## disconnect from database
+## disconnect from database and clean up workspace
 dbDisconnect(con)
+rm(list=ls())
+

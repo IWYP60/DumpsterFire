@@ -9,9 +9,12 @@ library(tidyverse)
 #### data to import
 iwyp_dir <- "iwyp60_data/"
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
-  mutate(measures = sapply(strsplit(., "_"), function(l) l[3])) %>%
+  mutate(measures = sapply(strsplit(., "_"), function(l) l[4])) %>%
   mutate(measures = sapply(strsplit(measures, ".csv"), function(l) l[1])) %>%
-  mutate(description = sapply(strsplit(., "_"), function(l) paste(l[2],l[1],sep='')))
+  mutate(description = sapply(strsplit(., "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
+  mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
+  mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
+  mutate(description = sub(pattern = 'GES2018', replacement = "GES18", x = description))
 
 traits <- c("Metabolomics-metabolite","Proteomics-functionalbin","Proteomics-peptide")
 cat("To import:", paste(traits))
@@ -35,41 +38,36 @@ names(tables) <- rq_tables
 ## take import file and assemble necessary columns to upload to compounddata table
 df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
   unnest %>% 
-  select(-.,-measures) %>% 
+  select(-.,-measures,-experiment_name) %>% 
   gather(sample_id, compound_value, -func_bin, -metabolite, -peptide, -description, na.rm = T) %>%
-  gather(compound_class, name, -description, -sample_id, -compound_value) %>%
+  gather(compound_class, name, -description, -sample_id, -compound_value, na.rm = T) %>%
   mutate(name = sub(pattern = " Elke", x = name, replacement = '')) %>% # remove " Elke"
   mutate(name = sub(pattern = " new", x = name, replacement = '')) %>% # remove " new"
   mutate(compound_id = tables$compounds$id[match(name, tables$compounds$name)]) %>%
   select(-compound_class, -name) %>%
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
-  ## crude substitute of experiment descriptions to match germinate tables
-  mutate(description = sub(pattern = 'Obregon2016', replacement = "CIMMYT2016", x = description)) %>%
-  mutate(description = sub(pattern = 'Obregon2017', replacement = "Obregon2017_PSTails", x = description)) %>%
   mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>%
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
   select(compound_id, germinatebase_id, dataset_id, compound_value)
 
-###
-tables$compounddata
+### subset import to new samples based on interaction of compound_id and dataset_id
+new_dat <- subset(df, !(interaction(compound_id, dataset_id) %in% interaction(tables$compounddata$compound_id, tables$compounddata$dataset_id)))
 
-df_cmpdata <- full_join(df, df_exps, by='description') %>%
-  full_join(df_germbase, by='sample_id') %>%
-  full_join(df_locations, by='site_name') %>%
-  full_join(df_cmp, by='func_bin') %>%
-  full_join(df_datasets, by='experiment_id') %>%
-  select(compound_id, germinatebase_id, dataset_id, compound_value)
+head(tables$compounddata)
+head(new_dat)
 
-####
-####
 ## APPEND DATA TO TABLE
-dbWriteTable(conn = con, name = 'compounddata', value = df_cmpdata, row.names = NA, append = TRUE)
+dbWriteTable(conn = con, name = 'compounddata', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
 test <- dbReadTable(name = "compounddata", conn=con)
+dim(test)
+head(test)
+tail(test)
 
-## disconnect from database
+## disconnect from database and clean up workspace
 dbDisconnect(con)
+rm(list=ls())
 

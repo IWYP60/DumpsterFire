@@ -8,12 +8,13 @@ library(tidyverse)
 
 #### collate data
 iwyp_dir <- "iwyp60_data/"
+traits <- c("Metabolomics-metabolite","Proteomics-functionalbin","Proteomics-peptide")
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
-  mutate(description = sapply(strsplit(., "_"), function(l) l[3])) %>%
-  mutate(description = sapply(strsplit(description, ".csv"), function(l) l[1]))
+  mutate(description = sapply(strsplit(., "_"), function(l) l[4])) %>%
+  mutate(description = sapply(strsplit(description, ".csv"), function(l) l[1])) %>%
+  filter(description %in% traits)
 
 ## Update compouds table with proteomic and metabolimic markers
-traits <- csv_fls$description[4:6]
 cat("To import:", paste(traits))
 
 ## setup compounds table for upload
@@ -52,7 +53,7 @@ dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, ap
 ## check updated table
 test <- dbReadTable(name = "compounds", conn=con)
 
-## disconnect from database
+## disconnect from database and clean up workspace
 dbDisconnect(con)
-
+rm(list=ls())
   
