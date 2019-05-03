@@ -15,7 +15,7 @@ con <- dbConnect(MySQL(),
 
 ## read tables required to pull database info
 table_names <- dbListTables(con)
-rq_tables <- c("compounddata", "compounds", "datasets", "experiments", "germinatebase")
+rq_tables <- c("compounddata", "compounds","datasetmembers", "datasets", "experiments", "germinatebase","groups","grouptypes","groupmembers")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 
 ## give tables names to make calling specific tables easier

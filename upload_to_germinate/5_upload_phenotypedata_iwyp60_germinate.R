@@ -8,12 +8,6 @@ library(tidyverse)
 
 #### collate data
 iwyp_dir <- "iwyp60_data/"
-traits <- c("Harvest","Resp","Lidar","Biomass")
-
-csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
-  mutate(description = sapply(strsplit(., "_"), function(l) l[4])) %>%
-  mutate(description = sapply(strsplit(description, ".csv"), function(l) l[1])) %>%
-  filter(description %in% traits)
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -23,20 +17,7 @@ con <- dbConnect(MySQL(),
 
 ## get database tables
 table_names <- dbListTables(con)
-rq_tables <- c("phenotypes","experiments")
+rq_tables <- c("phenotypedata","phenotypes","climates","climatedata")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
 names(tables) <- rq_tables
-
-#### Remove compounds already in cmp table
-new_dat <- subset(dat, !(name %in% tables$compounds$name))
-
-## APPEND DATA TO TABLE
-dbWriteTable(conn = con, name = 'phenotypes', value = new_dat, row.names = NA, append = TRUE)
-
-## check updated table
-test <- dbReadTable(name = "phenotypes", conn=con)
-
-## disconnect from database and clean up workspace
-dbDisconnect(con)
-rm(list=ls())

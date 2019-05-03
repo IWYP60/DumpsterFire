@@ -16,10 +16,10 @@ con <- dbConnect(MySQL(),
                  host = 'wheatyield.anu.edu.au',
                  password = askForPassword())
 
-
 ## get database tables
 table_names <- dbListTables(con)
-rq_tables <- c("datasets","locations","experiments","datasetstates")
+rq_tables <- c("links","datasets","locations","experiments","datasetstates",
+               "datasetmembers","datasetmembertypes","datasetpermissions","germinatebase")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
 names(tables) <- rq_tables
@@ -44,13 +44,29 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
 ### Remove datasets already existing
 new_dat <- subset(dat, !(interaction(description,datatype) %in% interaction(tables$datasets$description,tables$datasets$datatype)))
 
-## APPEND DATA TO EXISTING TABLE
+## APPEND DATA TO EXISTING TABLE datasets
 dbWriteTable(conn = con, name = 'datasets', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
 print(dbReadTable(name = "datasets", conn=con))
 
+## update datasetmembers
+a <- dbReadTable(name = "datasets", conn=con) %>%
+  mutate(dataset_id = id) %>%
+  mutate(datasetmembertype_id = 2) %>%
+  select(dataset_id, datasetmembertype_id)
+
+new_a <- subset(a, !(dataset_id%in% tables$datasetmembers$dataset_id))
+
+## APPEND DATA TO EXISTING TABLE datasetmembers
+dbWriteTable(conn = con, name = 'datasetmembers', value = new_a, row.names = NA, append = TRUE)
+
+## check updated table
+print(dbReadTable(name = "datasetmembers", conn=con))
+
 ## disconnect from database and clean up workspace
 dbDisconnect(con)
 rm(list=ls())
+
+
 
