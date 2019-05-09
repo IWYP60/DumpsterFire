@@ -51,6 +51,7 @@ dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, ap
 
 ## check updated table
 test <- dbReadTable(name = "compounds", conn=con)
+print(test)
 
 ## disconnect from database and clean up workspace
 dbDisconnect(con)
