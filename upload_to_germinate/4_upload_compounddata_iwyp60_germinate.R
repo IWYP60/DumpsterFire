@@ -1,5 +1,5 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## This script collates proteomic data and uploads to the compounddata table to the germinate3 database
+## This script collates proteomic data and uploads to the compounddata table of the germinate3 database
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation

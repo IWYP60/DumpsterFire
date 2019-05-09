@@ -34,8 +34,8 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
   mutate(description = sub(pattern = 'GES2018', replacement = "GES18", x = description)) %>%
   mutate(description = sub(pattern = 'Obregon2018_SBS', replacement = "Obregon2018_SerixBabax", x = description)) %>%
+  mutate(year = sapply(strsplit(., "_"), function(l) l[1])) %>%
   mutate(site_name_short = sapply(strsplit(., "_"), function(l) l[2])) %>%
-  ## assume all GES sites are GES CR04 - need to make better !!!!!
   mutate(site_name_short = ifelse(year == 2017, 
                                   yes = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short),
                                   no = sub(pattern = "GES", replacement = "GES VR11", x=site_name_short))) %>% 

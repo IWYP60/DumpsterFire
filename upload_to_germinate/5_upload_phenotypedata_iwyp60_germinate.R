@@ -65,7 +65,6 @@ dat <- mutate(out_traits, description = sapply(strsplit(file, "_"), function(l) 
   mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
   mutate(year = sapply(strsplit(file, "_"), function(l) l[1])) %>%
   mutate(site_name_short = sapply(strsplit(file, "_"), function(l) l[2])) %>%
-  ## assume all GES sites are GES CR04 - need to make better !!!!!
   mutate(site_name_short = ifelse(year == 2017, yes = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short), 
                                   no = sub(pattern = "GES", replacement = "GES VR11", x=site_name_short))) %>% 
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>%
@@ -77,7 +76,7 @@ dat <- mutate(out_traits, description = sapply(strsplit(file, "_"), function(l) 
 new_dat <- subset(dat, !(interaction(phenotype_id, germinatebase_id, dataset_id) %in% 
     interaction(tables$phenotypedata$phenotype_id, tables$phenotypedata$germinatebase_id, tables$phenotypedata$dataset_id)))
 
-## APPEND TABLES
+## APPEND PHENOTYPEDATA TABLE
 dbWriteTable(conn = con, name = 'phenotypedata', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
