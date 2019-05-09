@@ -29,7 +29,6 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(description = sapply(strsplit(., "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
   mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
-  ###
   ## Some of the following are assumptions that need to be checked!!!
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
@@ -37,8 +36,9 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(description = sub(pattern = 'Obregon2018_SBS', replacement = "Obregon2018_SerixBabax", x = description)) %>%
   mutate(site_name_short = sapply(strsplit(., "_"), function(l) l[2])) %>%
   ## assume all GES sites are GES CR04 - need to make better !!!!!
-  #####
-  mutate(site_name_short = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short)) %>% 
+  mutate(site_name_short = ifelse(year == 2017, 
+                                  yes = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short),
+                                  no = sub(pattern = "GES", replacement = "GES VR11", x=site_name_short))) %>% 
   mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>% 
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>% 
   select(experiment_id, location_id, description, datatype) %>%

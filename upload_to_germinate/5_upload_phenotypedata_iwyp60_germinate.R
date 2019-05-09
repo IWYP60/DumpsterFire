@@ -46,24 +46,32 @@ con <- dbConnect(MySQL(),
 ## get database tables
 table_names <- dbListTables(con)
 rq_tables <- c("germinatebase", "datasets", "locations", "treatments", "trialseries", "phenotypes", "locations", "phenotypedata")
-
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
 ## Populate table for upload
 dat <- mutate(out_traits, description = sapply(strsplit(file, "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
+  ## Some of the following are assumptions that need to be checked!!!
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
   mutate(description = sub(pattern = 'GES2018', replacement = "GES18", x = description)) %>%
+  mutate(description = sub(pattern = 'Obregon2018_SBS', replacement = "Obregon2018_SerixBabax", x = description)) %>%
   mutate(phenotype_id = tables$phenotypes$id[match(short_name, tables$phenotypes$short_name)]) %>%
   ## germinate_id based on SampleID, AccessionID, AccessionName, or PlantPlotID
   mutate(germinatebase_id = tables$germinatebase$id[match(ID, tables$germinatebase$general_identifier)]) %>%
   mutate(germinatebase_id = ifelse(is.na(germinatebase_id) == TRUE, yes = 
                                      tables$germinatebase$id[match(ID, tables$germinatebase$name)], no = germinatebase_id)) %>%
-  mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)])
-  
-  outselect(phenotype_id, germinatebase_id, phenotype_value, dataset_id, location_id, treatment_id, trialseries_id)
+  mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
+  mutate(year = sapply(strsplit(file, "_"), function(l) l[1])) %>%
+  mutate(site_name_short = sapply(strsplit(file, "_"), function(l) l[2])) %>%
+  ## assume all GES sites are GES CR04 - need to make better !!!!!
+  mutate(site_name_short = ifelse(year == 2017, yes = sub(pattern = "GES", replacement = "GES CR04", x=site_name_short), 
+                                  no = sub(pattern = "GES", replacement = "GES VR11", x=site_name_short))) %>% 
+  mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>%
+  # mutate(treatment_id = tables$treatments$id[match(name, tables$treatments$name)]) %>%
+  # mutate(trialseries_id = tables$trialseries$id[match(seriesname, tables$trialseries$seriesname)]) %>%
+  select(phenotype_id, germinatebase_id, phenotype_value, dataset_id, location_id)
 
 #### Remove pre-existing entries
 new_dat <- subset(dat, !(interaction(phenotype_id, germinatebase_id, dataset_id) %in% 
