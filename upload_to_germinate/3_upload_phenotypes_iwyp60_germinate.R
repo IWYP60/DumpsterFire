@@ -21,6 +21,7 @@ csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
 ### assemble all traits defined in keyfile
 out_traits <- NULL
 
+## ugh for loop because no-one followed data standards ...
 for(i in csv_fls$.){
   a <- read_csv(file.path(iwyp_dir, i)) %>%
     gather(trait, value, na.rm = T) %>%
