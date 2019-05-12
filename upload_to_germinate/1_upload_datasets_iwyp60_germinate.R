@@ -31,9 +31,7 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
   ## Some of the following are assumptions that need to be checked!!!
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
-  mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
-  mutate(description = sub(pattern = 'GES2018', replacement = "GES18", x = description)) %>%
-  mutate(description = sub(pattern = 'Obregon2018_SBS', replacement = "Obregon2018_SerixBabax", x = description)) %>%
+  mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
   mutate(., source_file = .) %>%
   mutate(year = sapply(strsplit(., "_"), function(l) l[1])) %>%
   mutate(site_name_short = sapply(strsplit(., "_"), function(l) l[2])) %>%
@@ -44,6 +42,7 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>%
   mutate(dataset_state_id = 1) %>%
   mutate(contact = 'andrew.bowerman@anu.edu.au') %>%
+  mutate(description = paste(description, datatype, sep=' ')) %>%
   select(experiment_id, location_id, description, source_file, datatype, dataset_state_id, contact)
   
 

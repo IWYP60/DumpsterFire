@@ -37,8 +37,9 @@ names(tables) <- rq_tables
 #### compounddata = metabolomics & proteomics
 ## take import file and assemble necessary columns to upload to compounddata table
 df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
-  unnest %>% 
-  select(-.,-measures,-experiment_name) %>% 
+  unnest %>%
+  mutate(description = paste(description,measures)) %>%
+  select(-.,-measures,-experiment_name) %>%
   gather(sample_id, compound_value, -func_bin, -metabolite, -peptide, -description, na.rm = T) %>%
   gather(compound_class, name, -description, -sample_id, -compound_value, na.rm = T) %>%
   mutate(name = sub(pattern = " Elke", x = name, replacement = '')) %>% # remove " Elke"
@@ -47,7 +48,8 @@ df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_nam
   select(-compound_class, -name) %>%
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
-  mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>%
+  mutate(experiment_id = tables$experiments$id[match(sapply(strsplit(description, " "),function(l) l[1]),
+                                                     tables$experiments$description)]) %>%
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
   select(compound_id, germinatebase_id, dataset_id, compound_value)

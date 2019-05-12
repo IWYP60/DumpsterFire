@@ -44,9 +44,7 @@ names(tables) <- rq_tables
 #### Remove compounds already in cmp table
 new_dat <- subset(dat, !(name %in% tables$compounds$name))
 
-####
 ## APPEND DATA TO TABLE
-## this can be changed to overwrite to replace entire compounds table - however this did not work well when trialled so BE CAREFUL
 dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table

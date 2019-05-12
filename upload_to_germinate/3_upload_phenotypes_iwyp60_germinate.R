@@ -56,8 +56,7 @@ tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 ## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
-## assemble units table
-#### ADD DESCRIPTION ETC FROM KEYFILE
+## assemble units table using keyfile
 dat_unit <- select(out_traits, unit_abbreviation) %>% unique
 
 ## check for pre-existing units
@@ -67,7 +66,7 @@ new_dat2 <- subset(dat_unit, !(unit_abbreviation %in% tables$units$unit_abbrevia
 dbWriteTable(conn = con, name = 'units', value = new_dat2, row.names = NA, append = TRUE)
 
 ## check table
-a <- print(dbReadTable(name = "units", conn=con))
+a <- dbReadTable(name = "units", conn=con)
 print(a)
 
 ## assemble phenotypes
