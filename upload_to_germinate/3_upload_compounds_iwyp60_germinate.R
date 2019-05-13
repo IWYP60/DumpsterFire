@@ -54,4 +54,3 @@ tail(dbReadTable(name = "compounds", conn=con))
 ## disconnect from database and clean up workspace
 dbDisconnect(con)
 rm(list=ls())
-  

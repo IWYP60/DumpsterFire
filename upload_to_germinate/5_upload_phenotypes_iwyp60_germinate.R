@@ -72,6 +72,7 @@ tail(a)
 ## assemble phenotypes
 dat <- mutate(out_traits, unit_id = a$id[match(unit_abbreviation, a$unit_abbreviation)]) %>% 
   ## add full trait name and description from keyfile 
+  mutate(short_name = description) %>%
   mutate(name = keyfile$name[match(short_name, keyfile$short_name)]) %>%
   mutate(description = keyfile$Description[match(short_name, keyfile$short_name)]) %>%
   mutate(name = ifelse(is.na(measure_id) == F, yes= paste(name,measure_id,sep = ';'), no=name)) %>%

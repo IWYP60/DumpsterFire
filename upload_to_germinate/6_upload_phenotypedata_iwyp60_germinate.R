@@ -53,7 +53,6 @@ names(tables) <- rq_tables
 ## Populate table for upload
 dat <- mutate(out_traits, description = sapply(strsplit(file, "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
   mutate(description = paste(description, datatype)) %>%
-  ## Some of the following are assumptions that need to be checked!!!
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
   mutate(phenotype_id = tables$phenotypes$id[match(short_name, tables$phenotypes$short_name)]) %>%
