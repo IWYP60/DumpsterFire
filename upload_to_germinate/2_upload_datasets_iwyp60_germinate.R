@@ -6,7 +6,6 @@ library(RMySQL) ## database implementation
 library(rstudioapi)
 library(tidyverse)
 
-##
 #### collate data
 iwyp_dir <- "iwyp60_data/"
 
@@ -29,7 +28,6 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(description = sapply(strsplit(., "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
   mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
-  ## Some of the following are assumptions that need to be checked!!!
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
   mutate(., source_file = .) %>%
@@ -40,11 +38,13 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
                                   no = sub(pattern = "GES", replacement = "GES VR11", x=site_name_short))) %>% 
   mutate(experiment_id = tables$experiments$id[match(description,tables$experiments$description)]) %>% 
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>%
+  mutate(version = 0.1) %>%
+  mutate(created_by = 1) %>%
   mutate(dataset_state_id = 1) %>%
+  mutate(license_id = 1) %>%
   mutate(contact = 'andrew.bowerman@anu.edu.au') %>%
   mutate(description = paste(description, datatype, sep=' ')) %>%
-  select(experiment_id, location_id, description, source_file, datatype, dataset_state_id, contact)
-  
+  select(experiment_id, location_id, description, source_file, datatype, version, created_by, dataset_state_id, license_id, contact)
 
 ### Remove datasets already existing
 new_dat <- subset(dat, !(interaction(description,datatype) %in% interaction(tables$datasets$description,tables$datasets$datatype)))

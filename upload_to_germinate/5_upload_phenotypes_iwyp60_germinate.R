@@ -28,20 +28,18 @@ for(i in csv_fls$.){
     mutate(file = i) %>%
     mutate(datatype = sapply(strsplit(file, "_"), function(l) l[4])) %>%
     mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
-    mutate(short_name = sapply(strsplit(trait, "_"), function(l) l[1])) %>%
+    mutate(description = sapply(strsplit(trait, "_"), function(l) l[1])) %>%
     mutate(unit_abbreviation = sapply(strsplit(trait, "_"), function(l) l[2])) %>%
     mutate(measure_id = sapply(strsplit(trait, "_"), function(l) l[3])) %>%
-    filter(short_name %in% keyfile$short_name)
+    filter(description %in% keyfile$short_name)
   
   out_traits <- rbind(a, out_traits)
 }
 
 ## see files and data sources imported
-table(out_traits$file)
 table(out_traits$datatype)
-table(out_traits$short_name)
-table(out_traits$unit_abbreviation)
-table(out_traits$measure_id)
+table(out_traits$description)
+head(out_traits)
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -49,15 +47,16 @@ con <- dbConnect(MySQL(),
                  host = 'wheatyield.anu.edu.au',
                  password = askForPassword())
 
-## get database tables
+## get database tables and give useable names
 table_names <- dbListTables(con)
 rq_tables <- c("phenotypes","units")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
-## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
 ## assemble units table using keyfile
-dat_unit <- select(out_traits, unit_abbreviation) %>% unique
+dat_unit <- select(out_traits, unit_abbreviation) %>% unique %>%
+  mutate(unit_name = units_keyfile$unit_name[match(unit_abbreviation, units_keyfile$unit_abbreviation)]) %>%
+  mutate(unit_description = units_keyfile$unit_description[match(unit_abbreviation, units_keyfile$unit_abbreviation)])
 
 ## check for pre-existing units
 new_dat2 <- subset(dat_unit, !(unit_abbreviation %in% tables$units$unit_abbreviation))
@@ -67,7 +66,8 @@ dbWriteTable(conn = con, name = 'units', value = new_dat2, row.names = NA, appen
 
 ## check table
 a <- dbReadTable(name = "units", conn=con)
-print(a)
+head(a)
+tail(a)
 
 ## assemble phenotypes
 dat <- mutate(out_traits, unit_id = a$id[match(unit_abbreviation, a$unit_abbreviation)]) %>% 

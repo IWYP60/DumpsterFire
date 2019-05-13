@@ -17,6 +17,18 @@ csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
 ## Update compouds table with proteomic and metabolimic markers
 cat("To import:", paste(traits))
 
+## connect to database
+con <- dbConnect(MySQL(),
+                 dbname="iwyp60_germinate_dev",
+                 host = 'wheatyield.anu.edu.au',
+                 password = askForPassword())
+
+## get database tables and give useable names
+table_names <- dbListTables(con)
+rq_tables <- c("compounds","units")
+tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
+names(tables) <- rq_tables
+
 ## setup compounds table for upload
 dat <- subset(csv_fls, description %in% traits) %>%
   mutate(contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
@@ -25,31 +37,19 @@ dat <- subset(csv_fls, description %in% traits) %>%
   gather(compound_class, name, -description, na.rm = T) %>%
   mutate(compound_class = sapply(strsplit(description,"-"), function(l) l[2])) %>%
   mutate(description = sapply(strsplit(description,"-"), function(l) l[1])) %>%
+  mutate(unit_id = 1) %>%
   mutate(name = sub(pattern = " Elke", x = name, replacement = '')) %>% # remove " Elke"
   mutate(name = sub(pattern = " new", x = name, replacement = '')) # remove " new"
-
-## connect to database
-con <- dbConnect(MySQL(),
-                 dbname="iwyp60_germinate_dev",
-                 host = 'wheatyield.anu.edu.au',
-                 password = askForPassword())
-
-## get database tables
-table_names <- dbListTables(con)
-rq_tables <- c("compounds")
-tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
-## give tables names to make calling specific table easier
-names(tables) <- rq_tables
 
 #### Remove compounds already in cmp table
 new_dat <- subset(dat, !(name %in% tables$compounds$name))
 
 ## APPEND DATA TO TABLE
-dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, append = TRUE)
+dbWriteTable(conn = con, name = 'compounds', value = dat, row.names = NA, append = TRUE)
 
 ## check updated table
-test <- dbReadTable(name = "compounds", conn=con)
-print(test)
+head(dbReadTable(name = "compounds", conn=con))
+tail(dbReadTable(name = "compounds", conn=con))
 
 ## disconnect from database and clean up workspace
 dbDisconnect(con)

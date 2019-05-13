@@ -13,8 +13,7 @@ csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(measures = sapply(strsplit(measures, ".csv"), function(l) l[1])) %>%
   mutate(description = sapply(strsplit(., "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
-  mutate(description = sub(pattern = 'GES2017', replacement = "GES17", x = description)) %>%
-  mutate(description = sub(pattern = 'GES2018', replacement = "GES18", x = description))
+  mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description))
 
 traits <- c("Metabolomics-metabolite","Proteomics-functionalbin","Proteomics-peptide")
 cat("To import:", paste(traits))
@@ -27,14 +26,12 @@ con <- dbConnect(MySQL(),
                  host = 'wheatyield.anu.edu.au',
                  password = askForPassword())
 
-## get database tables
+## get database tables and give useable names
 table_names <- dbListTables(con)
-rq_tables <- c("experiments","entitytypes","germinatebase","locations","datasets","compounds","compounddata")
+rq_tables <- c("experiments","entitytypes","germinatebase","datasets","compounds","compounddata")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
-## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
-#### compounddata = metabolomics & proteomics
 ## take import file and assemble necessary columns to upload to compounddata table
 df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
   unnest %>%
