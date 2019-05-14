@@ -40,11 +40,10 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(location_id = tables$locations$id[match(site_name_short, tables$locations$site_name_short)]) %>%
   mutate(version = 0.1) %>%
   mutate(created_by = 1) %>%
-  mutate(dataset_state_id = 1) %>%
-  mutate(license_id = 1) %>%
+  mutate(dataset_state_id = 2) %>%
   mutate(contact = 'andrew.bowerman@anu.edu.au') %>%
   mutate(description = paste(description, datatype, sep=' ')) %>%
-  select(experiment_id, location_id, description, source_file, datatype, version, created_by, dataset_state_id, license_id, contact)
+  select(experiment_id, location_id, description, source_file, datatype, version, created_by, dataset_state_id, contact)
 
 ### Remove datasets already existing
 new_dat <- subset(dat, !(interaction(description,datatype) %in% interaction(tables$datasets$description,tables$datasets$datatype)))

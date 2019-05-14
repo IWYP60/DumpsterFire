@@ -45,7 +45,7 @@ dat <- subset(csv_fls, description %in% traits) %>%
 new_dat <- subset(dat, !(name %in% tables$compounds$name))
 
 ## APPEND DATA TO TABLE
-dbWriteTable(conn = con, name = 'compounds', value = dat, row.names = NA, append = TRUE)
+dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
 head(dbReadTable(name = "compounds", conn=con))

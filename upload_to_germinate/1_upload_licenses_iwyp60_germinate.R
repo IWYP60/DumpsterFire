@@ -29,6 +29,8 @@ a <- as.data.frame(rbind(
 
 colnames(a) <-  c('name', 'description')
 
+a <- subset(a, !(name %in% tables$licenses$name))
+
 ## APPEND DATA TO TABLE
 dbWriteTable(conn = con, name = 'licenses', value = a, row.names = NA, append = TRUE)
 

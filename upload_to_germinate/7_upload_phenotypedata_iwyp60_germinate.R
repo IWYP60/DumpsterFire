@@ -43,11 +43,10 @@ con <- dbConnect(MySQL(),
                  host = 'wheatyield.anu.edu.au',
                  password = askForPassword())
 
-## get database tables
+## get database tables and give useable names
 table_names <- dbListTables(con)
 rq_tables <- c("germinatebase", "datasets", "locations", "treatments", "trialseries", "phenotypes", "locations", "phenotypedata")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
-## give tables names to make calling specific table easier
 names(tables) <- rq_tables
 
 ## Populate table for upload

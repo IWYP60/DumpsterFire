@@ -17,8 +17,6 @@ con <- dbConnect(MySQL(),
 table_names <- dbListTables(con)
 rq_tables <- c("compounddata", "compounds","datasetmembers", "datasets", "experiments", "germinatebase","groups","grouptypes","groupmembers")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
-
-## give tables names to make calling specific tables easier
 names(tables) <- rq_tables
 
 df <- select(tables$compounddata, compound_id, germinatebase_id, dataset_id, compound_value) %>%

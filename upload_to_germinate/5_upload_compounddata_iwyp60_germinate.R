@@ -47,7 +47,6 @@ df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_nam
   mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(experiment_id = tables$experiments$id[match(sapply(strsplit(description, " "),function(l) l[1]),
                                                      tables$experiments$description)]) %>%
-  mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
   select(compound_id, germinatebase_id, dataset_id, compound_value)
 
