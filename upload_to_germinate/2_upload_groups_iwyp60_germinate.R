@@ -43,7 +43,7 @@ names(tables) <- rq_tables
 ### collate all panels to add as "groups"
 grp_panel <- select(site_accessions, ID, Panel) %>%
   mutate(name = Panel) %>%
-  mutate(description = "Wheat accession panel") %>%
+  mutate(description = "Accession panel") %>%
   mutate(visibility = 1) %>%
   mutate(grouptype_id = 3) %>%
   select(name, description, visibility, grouptype_id) %>%
@@ -56,8 +56,7 @@ dbWriteTable(conn = con, name = 'groups', value = grp_panel, row.names = NA, app
 
 ## check updated table
 a <- dbReadTable(name = "groups", conn=con)
-head(a)
-tail(a)
+print(a)
 
 ## collate panel members
 grp_panel_members <- mutate(site_accessions, germinatebase_id = tables$germinatebase$id[match(ID,tables$germinatebase$general_identifier)]) %>%
@@ -79,6 +78,9 @@ a <- dbReadTable(name = "groupmembers", conn=con)
 head(a)
 tail(a)
 
-#   mutate(site_accessions, description = sapply(strsplit(file, "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
-#     mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
-#     mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
+### locations groups
+
+
+## disconnect from database and clean up workspace
+dbDisconnect(con)
+rm(list=ls())
