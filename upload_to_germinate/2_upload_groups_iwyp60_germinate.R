@@ -27,7 +27,6 @@ for(i in csv_fls$.){
   site_accessions <- rbind(a, site_accessions)
 }
 
-
 ## connect to database
 con <- dbConnect(MySQL(),
                  dbname="iwyp60_germinate_dev",
@@ -40,12 +39,23 @@ rq_tables <- c("groups","locations","germinatebase","markers","grouptypes","grou
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 names(tables) <- rq_tables
 
+## update grouptypes to include trialsite
+w <- tibble(description = "trialsite", target_table = "locations")
+w <- subset(w, !(description %in% tables$grouptypes$description))
+
+## APPEND DATA TO TABLE
+dbWriteTable(conn = con, name = 'grouptypes', value = w, row.names = NA, append = TRUE)
+
+## check updated table
+w <- dbReadTable(name = "grouptypes", conn=con)
+print(w)
+
 ### collate all panels to add as "groups"
 grp_panel <- select(site_accessions, ID, Panel) %>%
   mutate(name = Panel) %>%
   mutate(description = "Accession panel") %>%
   mutate(visibility = 1) %>%
-  mutate(grouptype_id = 3) %>% ## grouptype 3 = accessions
+  mutate(grouptype_id = 4) %>% ## grouptype 3 = accessions
   select(name, description, visibility, grouptype_id) %>%
   unique
 
