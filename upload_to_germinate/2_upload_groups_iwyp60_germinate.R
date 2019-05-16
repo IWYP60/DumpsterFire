@@ -55,7 +55,7 @@ grp_panel <- select(site_accessions, ID, Panel) %>%
   mutate(name = Panel) %>%
   mutate(description = "Accession panel") %>%
   mutate(visibility = 1) %>%
-  mutate(grouptype_id = 4) %>% ## grouptype 3 = accessions
+  mutate(grouptype_id = 3) %>% ## grouptype 3 = accessions
   select(name, description, visibility, grouptype_id) %>%
   unique
 
@@ -79,7 +79,7 @@ grp_locs <- select(site_accessions, file) %>%
   mutate(location_id = tables$locations$id[match(name, tables$locations$name)]) %>%
   mutate(description = "Trial location") %>%
   mutate(visibility = 1) %>%
-  mutate(grouptype_id = 1) %>% ## grouptype 1 = Collecting site
+  mutate(grouptype_id = 4) %>% ## grouptype 1 = trialsite
   select(name, description, visibility, grouptype_id) %>%
   unique
 
