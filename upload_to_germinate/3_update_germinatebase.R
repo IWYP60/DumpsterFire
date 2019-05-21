@@ -64,8 +64,15 @@ a <- tables$germinatebase %>%
                               yes = sample_ids$institution_id[match(name, sample_ids$ID)],
                               no = institution_id))
 
+## turn foreign ID checsk off
+# dbExecute(conn = con, statement = 'SELECT @FOREIGN_KEY_CHECKS;')
+# dbExecute(conn = con, statement = 'SET FOREIGN_KEY_CHECKS = 0;')
+
 ## OVERWRITE germinatebase table with new info
-# dbWriteTable(conn = con, name = 'germinatebase', value = a, row.names=FALSE, overwrite = TRUE)
+# dbWriteTable(conn = con, name = 'germinatebase', value = a, overwrite = TRUE)
+
+## turn foreign ID checks on
+# dbExecute(conn = con, statement = 'SET FOREIGN_KEY_CHECKS = 1;')
 
 ## check updated table
 w <- print(dbReadTable(name = "germinatebase", conn=con))

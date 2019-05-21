@@ -10,7 +10,7 @@ library(tidyverse)
 iwyp_dir <- "iwyp60_data/"
 traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
 
-keyfile <- read_delim(file.path(iwyp_dir, "Phenotypes_README.txt"), delim = '\t')
+keyfile <- read_csv(file.path(iwyp_dir, "Phenotypes_README.csv"))
 units_keyfile <- read_delim(file.path(iwyp_dir, "Units_README.txt"), delim = '\t')
 
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
@@ -39,7 +39,6 @@ for(i in csv_fls$.){
 ## see files and data sources imported
 table(out_traits$datatype)
 table(out_traits$description)
-head(out_traits)
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -66,8 +65,7 @@ dbWriteTable(conn = con, name = 'units', value = new_dat2, row.names = NA, appen
 
 ## check table
 a <- dbReadTable(name = "units", conn=con)
-head(a)
-tail(a)
+print(a)
 
 ## assemble phenotypes
 dat <- mutate(out_traits, unit_id = a$id[match(unit_abbreviation, a$unit_abbreviation)]) %>% 

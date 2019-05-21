@@ -10,7 +10,7 @@ library(tidyverse)
 iwyp_dir <- "iwyp60_data/"
 traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
 
-keyfile <- read_delim(file.path(iwyp_dir, "Phenotypes_README.txt"), delim = '\t')
+keyfile <- read_csv(file.path(iwyp_dir, "Phenotypes_README.csv"))
 units_keyfile <- read_delim(file.path(iwyp_dir, "Units_README.txt"), delim = '\t')
 
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
@@ -45,7 +45,8 @@ con <- dbConnect(MySQL(),
 
 ## get database tables and give useable names
 table_names <- dbListTables(con)
-rq_tables <- c("germinatebase", "datasets", "locations", "treatments", "trialseries", "phenotypes", "locations", "phenotypedata")
+rq_tables <- c("germinatebase", "datasets", "locations", "treatments", "trialseries", 
+               "phenotypes", "locations", "phenotypedata","trialseries")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 names(tables) <- rq_tables
 
