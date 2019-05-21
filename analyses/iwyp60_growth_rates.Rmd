@@ -10,7 +10,7 @@ Explore growth rates across IWYP field trial data.
 
 ### Method
 
-Insert paper here??
+Utilise measures of Normalized Vegetation Index (NDVI, Greenseeker) to estimate growth rates using a nonlinear modelling approach [Paine et al 2012](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00155.x). Also see [Fitting von Bertalanffy Growth Function](http://rpubs.com/lacs/1123).
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, warning = FALSE, message = FALSE, results = 'asis')
@@ -47,7 +47,11 @@ dbDisconnect(con)
 ### Results
 
 ```{r}
-a <- select(df, )
+## get phenotype IDs of interest
+keep_ids <- filter(tables$phenotypes, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") %>% select(id)
+
+## subset global df to NDVI values
+a <- filter(df, phenotype_id %in% keep_ids) %>% select(phenotype_id, germinatebase_id, experiment_id, dataset_id, description.y, phenotype_value)
 
 
 ```

@@ -21,8 +21,7 @@ csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
 ### assemble phenotype data
 out_traits <- NULL
 
-## ugh for loop because no-one followed data standards ...
-## NOTE: make sure there is an ID column in spreadsheets that contain either SampleID, AccessionID, AccessionName, or PlantPlotID
+## NOTE: make sure there is an ID column in spreadsheets that contain either SampleID, PlantPlotID, AccessionID, or AccessionName 
 for(i in csv_fls$.){
   a <- read_csv(file.path(iwyp_dir, i)) %>%
     gather(trait, phenotype_value, -ID, na.rm = T) %>%
@@ -55,8 +54,13 @@ dat <- mutate(out_traits, description = sapply(strsplit(file, "_"), function(l) 
   mutate(description = paste(description, datatype)) %>%
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
+  
+  ## match by short_name to get phenotype ID, also use date if needed
   mutate(phenotype_id = tables$phenotypes$id[match(short_name, tables$phenotypes$short_name)]) %>%
-  ## germinate_id based on SampleID, AccessionID, AccessionName, or PlantPlotID
+  mutate(short_name2 = ifelse(is.na(phenotype_id) == F, yes = short_name, no = paste(short_name,measure_id,sep=";"))) %>%
+  mutate(phenotype_id = tables$phenotypes$id[match(short_name2, tables$phenotypes$short_name)]) %>%
+  
+  ## germinate_id based on SampleID, AccessionID, AccessionName, or PlantPlotID - defined above
   mutate(germinatebase_id = tables$germinatebase$id[match(ID, tables$germinatebase$general_identifier)]) %>%
   mutate(germinatebase_id = ifelse(is.na(germinatebase_id) == TRUE, yes = 
                                      tables$germinatebase$id[match(ID, tables$germinatebase$name)], no = germinatebase_id)) %>%
