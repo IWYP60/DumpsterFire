@@ -12,9 +12,6 @@ Explore growth rates across IWYP field trial data.
 
 Insert paper here??
 
-### Results
-
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, warning = FALSE, message = FALSE)
 
@@ -55,3 +52,4 @@ dbDisconnect(con)
 
 ```
 
+### Results
