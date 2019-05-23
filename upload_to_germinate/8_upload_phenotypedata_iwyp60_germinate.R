@@ -11,7 +11,7 @@ iwyp_dir <- "iwyp60_data/"
 traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
 
 keyfile <- read_csv(file.path(iwyp_dir, "Phenotypes_README.csv"))
-units_keyfile <- read_delim(file.path(iwyp_dir, "Units_README.txt"), delim = '\t')
+units_keyfile <- read_csv(file.path(iwyp_dir, "Units_README.csv"))
 
 csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
   mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
