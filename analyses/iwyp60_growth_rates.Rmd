@@ -150,14 +150,10 @@ plot(fit.logis)
 logLik(fit.logis)
 AIC(fit.logis)
 
-
-
-## not working ...
 ## fit logistic model using nlme
 # assign data groups
-# df_asymp_pp   <- groupedData(formula = Y ~ X_num | pp, data = df)
-# fit.logis   <- nlsList(Y ~ SSlogis(X, Asym, xmid, scal), data = df_asymp_pp)
-# fit.logis.nlme <- nlme(fit.logis)
+df_asymp_pp   <- groupedData(formula = Y ~ X_num | pp, data = df)
+fit.logis.nlme <- nlme(Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_asymp_pp, fixed = Asym + xmid + scal ~ 1)
 
 ```
 
