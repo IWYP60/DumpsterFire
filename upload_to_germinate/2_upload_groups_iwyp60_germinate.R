@@ -1,5 +1,5 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## This script populates groups table
+## This script populates 'groups' and 'groupmembers' tables
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
@@ -110,8 +110,7 @@ dbWriteTable(conn = con, name = 'groupmembers', value = grp_panel_members, row.n
 
 ## check updated table
 b <- dbReadTable(name = "groupmembers", conn=con)
-head(b)
-tail(b)
+print(b)
 
 ### locations group members
 grp_locs_members <- select(site_accessions, file) %>%
@@ -133,8 +132,7 @@ dbWriteTable(conn = con, name = 'groupmembers', value = grp_locs_members, row.na
 
 ## check updated table
 b <- dbReadTable(name = "groupmembers", conn=con)
-head(b)
-tail(b)
+print(b)
 
 ## disconnect from database and clean up workspace
 dbDisconnect(con)

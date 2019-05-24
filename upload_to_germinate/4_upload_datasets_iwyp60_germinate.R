@@ -1,5 +1,5 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## This script updates datasets table based on import data and locations table
+## This script updates 'datasets' and 'datasetmembers' tables based on import data and locations table
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
@@ -8,6 +8,14 @@ library(tidyverse)
 
 #### collate data
 iwyp_dir <- "iwyp60_data/"
+traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
+compound_sets <- c('Metabolomics-metabolite', 'Proteomics-functionalbin', 'Proteomics-peptide')
+
+## subset csv files
+csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
+  mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
+  mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
+  filter(datatype %in% traits | datatype %in% compound_sets)
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -24,12 +32,15 @@ tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 names(tables) <- rq_tables
 
 ### setup datasets table including linking location_id and experiment_id
-dat <- dir(iwyp_dir, "csv") %>% tibble %>%
+dat <- csv_fls %>%
   mutate(description = sapply(strsplit(., "_"), function(l) paste0(l[2],l[1],"_",l[3]))) %>%
   mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
   mutate(description = sub(pattern = 'Obregon2016_trial', replacement = "CIMMYT2016", x = description)) %>%
   mutate(description = sub(pattern = 'GES20', replacement = "GES", x = description)) %>%
+  mutate(description = ifelse(datatype %in% compound_sets, 
+                              yes = paste(description,datatype,sep=' '),
+                              no= description)) %>%
   mutate(., source_file = .) %>%
   mutate(year = sapply(strsplit(., "_"), function(l) l[1])) %>%
   mutate(site_name_short = sapply(strsplit(., "_"), function(l) l[2])) %>%
@@ -41,12 +52,12 @@ dat <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(version = 0.1) %>%
   mutate(created_by = 1) %>%
   mutate(dataset_state_id = 2) %>%
-  mutate(contact = 'andrew.bowerman@anu.edu.au') %>%
-  mutate(description = paste(description, datatype, sep=' ')) %>%
+  mutate(contact = 'diep.ganguly@anu.edu.au') %>%
+  mutate(description=ifelse(datatype %in% compound_sets, yes=description, no= paste(description, datatype, sep=' '))) %>%
   select(experiment_id, location_id, description, source_file, datatype, version, created_by, dataset_state_id, contact)
 
 ### Remove datasets already existing
-new_dat <- subset(dat, !(interaction(description,datatype) %in% interaction(tables$datasets$description,tables$datasets$datatype)))
+new_dat <- subset(dat, !(description %in% tables$datasets$description))
 
 ## APPEND DATA TO EXISTING TABLE datasets
 dbWriteTable(conn = con, name = 'datasets', value = new_dat, row.names = NA, append = TRUE)
@@ -54,6 +65,7 @@ dbWriteTable(conn = con, name = 'datasets', value = new_dat, row.names = NA, app
 ## check updated table
 print(dbReadTable(name = "datasets", conn=con))
 
+################
 ## update datasetmembers
 a <- dbReadTable(name = "datasets", conn=con) %>%
   mutate(dataset_id = id) %>%

@@ -14,9 +14,6 @@ csv_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(description = sapply(strsplit(description, ".csv"), function(l) l[1])) %>%
   filter(description %in% traits)
 
-## Update compouds table with proteomic and metabolimic markers
-cat("To import:", paste(traits))
-
 ## connect to database
 con <- dbConnect(MySQL(),
                  dbname="iwyp60_germinate_dev",
@@ -33,8 +30,8 @@ names(tables) <- rq_tables
 dat <- subset(csv_fls, description %in% traits) %>%
   mutate(contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_names = T))) %>% 
   unnest %>% 
-  select(description, metabolite, func_bin, peptide) %>%
-  gather(compound_class, name, -description, na.rm = T) %>%
+  select(description, compound) %>%
+  rename(name = compound) %>%
   mutate(compound_class = sapply(strsplit(description,"-"), function(l) l[2])) %>%
   mutate(description = sapply(strsplit(description,"-"), function(l) l[1])) %>%
   mutate(unit_id = 1) %>%
@@ -48,8 +45,7 @@ new_dat <- subset(dat, !(name %in% tables$compounds$name))
 dbWriteTable(conn = con, name = 'compounds', value = new_dat, row.names = NA, append = TRUE)
 
 ## check updated table
-head(dbReadTable(name = "compounds", conn=con))
-tail(dbReadTable(name = "compounds", conn=con))
+print(dbReadTable(name = "compounds", conn=con))
 
 ## disconnect from database and clean up workspace
 dbDisconnect(con)

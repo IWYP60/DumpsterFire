@@ -2,7 +2,7 @@
 title: "Exploring growth rates IWYP"
 author: "A Bowerman, D Ganguly"
 date: "21/05/2019"
-output: pdf_document
+output: html_document
 ---
 
 ### Aim 
@@ -10,10 +10,13 @@ Explore growth rates across IWYP field trial data.
 
 ### Method
 
-Utilise measures of Normalized Vegetation Index (NDVI, Greenseeker) to estimate growth rates using a nonlinear modelling approach [Paine et al 2012](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00155.x). Also see [Fitting von Bertalanffy Growth Function](http://rpubs.com/lacs/1123) and [fishR](http://derekogle.com/fishR/examples/oldFishRVignettes/VonBertalanffy.pdf).
+Utilise measures of Normalized Vegetation Index (NDVI, Greenseeker) to estimate growth rates using a nonlinear modelling approach [Paine et al 2012](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00155.x).
+
+
+Also see [Fitting von Bertalanffy Growth Function](http://rpubs.com/lacs/1123) and [fishR](http://derekogle.com/fishR/examples/oldFishRVignettes/VonBertalanffy.pdf).
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, tidy = TRUE, warning = FALSE, message = FALSE, results = 'asis')
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, warning = FALSE, message = FALSE, results = 'asis')
 
 library(tidyverse)
 library(DBI) ## functions to interface with databases
@@ -41,16 +44,6 @@ df <- select(tables$phenotypedata, phenotype_id, germinatebase_id, dataset_id, p
 ## disconnect from database
 dbDisconnect(con)
 
-```
-
-### Results
-
-The raw NDVI values can first be visualized as a jitter plot to get an idea of the existing data and for rough modelling, we can apply some polynomial models (2nd order and loess).
-
-```{r}
-library(pheatmap)
-library(ggforce)
-
 ## get accession groups and members together
 accs <- filter(tables$groups, grouptype_id == 3) %>%
   left_join(tables$groupmembers, by=c("id"="group_id")) %>%
@@ -63,26 +56,26 @@ dat <- filter(df, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") 
   mutate(date = sapply(strsplit(short_name, ";"), function(l) l[2])) %>%
   mutate(date = paste0(date,sapply(strsplit(source_file,"_"), function(l) l[1]))) %>%
   mutate(date = as.Date(date, tryFormats = c("%d%b%Y"))) %>%
-  mutate(value = as.numeric(paste(phenotype_value))) %>%
+  rename(value = phenotype_value) %>%
+  mutate(value = as.numeric(paste(value))) %>%
   mutate(dataset = tables$datasets$description[match(dataset_id, tables$datasets$id)])
-
-### plot jitter
-ggplot(dat, aes(x=date, y=value)) + 
-  geom_jitter() + 
-  facet_wrap(~dataset) + 
-  geom_smooth(method='loess') +
-  geom_smooth(method="lm", formula = y ~ poly(x, 2, raw=T), color = "salmon") +
-  scale_y_continuous(name = "NDVI") +
-  scale_x_date(name = "Measuring date") +
-  ggtitle("NDVI data") +
-  theme(legend.position = "none")
 
 ```
 
+### Results
 
-Next, we can start to explore individual sample patterns - given the number this can be hard to do using scatterplots. Instead, let's try a heatmap.
+View initial dataframe. 
+
+```{r, results='markup'}
+head(dat)
+```
+
+As an initial exploratory exercise, we can produce a heatmap to look at individual growth behaviours.
 
 ```{r}
+library(pheatmap)
+library(ggforce)
+
 ## make numeric matrix and heatmap
 my_mat <- select(dat, germinatebase_id, date, value) %>%
   group_by(germinatebase_id, date) %>%
@@ -108,12 +101,63 @@ pheatmap(mat = my_mat,
          angle_col = 45
         )
 
-
 ```
 
 The data appear to group into 4 temporal behaviours.
 
+We can also plot raw NDVI values with generic polynomial fits (2nd order and loess). 
+
 ```{r}
+### plot jitter
+ggplot(dat, aes(x=date, y=value)) + 
+  geom_jitter() + 
+  facet_wrap(~dataset) + 
+  geom_smooth(method='loess') +
+  geom_smooth(method="lm", formula = y ~ poly(x, 2, raw=T), color = "salmon") +
+  scale_y_continuous(name = "NDVI") +
+  scale_x_date(name = "Measuring date") +
+  ggtitle("NDVI data") +
+  theme(legend.position = "none")
+
+```
+
+Polynomial models clearly do *not* appropriately describe the growth behaviour observed and are discouraged in modelling growth rates (Paine et al 2012). Instead, we will utilize two non-linear growth models to model absolute growth rate (AGR) and relative growth rate (RGR) with *asymptotic fits*:
+
+1. _*logistic*_ model
+  - AGR = $\frac{rM_{0}Ke^{-rt}(K - M_{0})}{(M_{0} + e^{-rt}(K - M_{0}))^{2}}$
+  - RGR (time)
+  - RGR (mass)
+2. _*Gompertz*_ model
+  - AGR = $rKe^{-rt}(\frac{M_{0}}{K})^{e^{-rt}} ln\frac{K}{M_{0}}$
+  - RGR (time)
+  - RGR (mass)
+
+Which fitting routine to use [nls, gnls, nlsList, or nlme]? If you have no treatment effects, ie, a model of the form y ~ x, use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+
+```{r}
+library(nlme)
+
+## for now just to 2018 GES Extras which has plant plot ids
+df <- filter(dat, source_file == "2018_GES_Extras_Lidar.csv") %>% 
+  rename(X=date, Y=value, pp=general_identifier) %>% 
+  mutate(X_num = as.numeric(X)) %>%
+  select(Y,X,pp,X_num)
+
+## fit logistic model using nls
+fit.logis  <- nls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df)
+summary(fit.logis)
+plot(fit.logis)
+logLik(fit.logis)
+AIC(fit.logis)
+
+
+
+## not working ...
+## fit logistic model using nlme
+# assign data groups
+# df_asymp_pp   <- groupedData(formula = Y ~ X_num | pp, data = df)
+# fit.logis   <- nlsList(Y ~ SSlogis(X, Asym, xmid, scal), data = df_asymp_pp)
+# fit.logis.nlme <- nlme(fit.logis)
 
 ```
 

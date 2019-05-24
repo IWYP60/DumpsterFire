@@ -37,17 +37,20 @@ df <- mutate(files, contents = map(., ~ read_csv(file.path(iwyp_dir, .), col_nam
   unnest %>%
   mutate(description = paste(description,measures)) %>%
   select(-.,-measures,-experiment_name) %>%
-  gather(sample_id, compound_value, -func_bin, -metabolite, -peptide, -description, na.rm = T) %>%
-  gather(compound_class, name, -description, -sample_id, -compound_value, na.rm = T) %>%
+  gather(sample_id, compound_value, -compound, -description, na.rm = T) %>%
+  rename(name=compound) %>%
   mutate(name = sub(pattern = " Elke", x = name, replacement = '')) %>% # remove " Elke"
   mutate(name = sub(pattern = " new", x = name, replacement = '')) %>% # remove " new"
+  ## link to compound id
   mutate(compound_id = tables$compounds$id[match(name, tables$compounds$name)]) %>%
-  select(-compound_class, -name) %>%
+  ## link to germinatebase_id, entitytype_id w/ 'germinatebase' table
   mutate(germinatebase_id = tables$germinatebase$id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
   mutate(entitytype_id = tables$germinatebase$entitytype_id[match(sample_id,tables$germinatebase$general_identifier)]) %>%
-  mutate(experiment_id = tables$experiments$id[match(sapply(strsplit(description, " "),function(l) l[1]),
-                                                     tables$experiments$description)]) %>%
+  ## link experiment_id
+  mutate(experiment_id = tables$experiments$id[match(sapply(strsplit(description, " "),function(l) l[1]),tables$experiments$description)]) %>%
+  ## link dataset id
   mutate(dataset_id = tables$datasets$id[match(description,tables$datasets$description)]) %>%
+  ## select required columns
   select(compound_id, germinatebase_id, dataset_id, compound_value)
 
 ### subset import to new samples based on interaction of compound_id and dataset_id

@@ -1,5 +1,5 @@
 ## R code to connect and interface with IWYP60 Germinate database
-## This script populates licenses table
+## This script populates licenses table and adds experimenttypes
 
 library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
@@ -14,10 +14,22 @@ con <- dbConnect(MySQL(),
 
 ## get specific database tables, read into R, and give names
 table_names <- dbListTables(con)
-rq_tables <- c("datasets","licenses","licenselogs")
+rq_tables <- c("datasets","licenses","licenselogs","experimenttypes")
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 names(tables) <- rq_tables
 
+## add 'compound' experiment type
+b <- as.data.frame(rbind("compound"))
+colnames(b) <- "description"
+b <- subset(b, !(description %in% tables$experimenttypes$description))
+
+## APPEND DATA TO TABLE
+dbWriteTable(conn = con, name = 'experimenttypes', value = b, row.names = NA, append = TRUE)
+
+## check updated table
+print(dbReadTable(name = "experimenttypes", conn=con))
+
+### Define licenses
 a <- as.data.frame(rbind(
   c("IWYP pending", "license pending grants by IWYP"),
   c("CC-BY-NC-ND","Anyone can share this material, provided it remains unaltered in any way, this is not done for commercial purposes, and the original authors are credited and cited."),
@@ -28,7 +40,6 @@ a <- as.data.frame(rbind(
 )
 
 colnames(a) <-  c('name', 'description')
-
 a <- subset(a, !(name %in% tables$licenses$name))
 
 ## APPEND DATA TO TABLE
