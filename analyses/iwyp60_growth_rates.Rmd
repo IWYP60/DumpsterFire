@@ -23,7 +23,7 @@ library(DBI) ## functions to interface with databases
 library(RMySQL) ## database implementation
 library(rstudioapi)
 
-## generate DBI COnnection Object / establish connection with database
+## connect to germinat3 db with read-only account
 con <- dbConnect(MySQL(),
           dbname="iwyp60_germinate_dev",
           user = "iwyp60ro",
@@ -35,7 +35,8 @@ rq_tables <- c("phenotypedata", "phenotypes", "grouptypes", "datasets", "experim
 tables <- lapply(FUN=dbReadTable, X=rq_tables, conn=con)
 names(tables) <- rq_tables
 
-df <- select(tables$phenotypedata, phenotype_id, germinatebase_id, dataset_id, phenotype_value) %>%
+## pull data needed
+dat_init <- select(tables$phenotypedata, phenotype_id, germinatebase_id, dataset_id, phenotype_value) %>%
   full_join(., tables$phenotypes, by=c("phenotype_id"="id")) %>%
   full_join(., tables$germinatebase, by=c("germinatebase_id"="id")) %>%
   full_join(., tables$datasets, by=c("dataset_id"="id")) %>%
@@ -50,7 +51,7 @@ accs <- filter(tables$groups, grouptype_id == 3) %>%
   mutate(general_id = tables$germinatebase$general_identifier[match(foreign_id, tables$germinatebase$id)])
 
 ## Extract NDVI values
-dat <- filter(df, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") %>%
+dat <- filter(dat_init, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") %>%
   select(source_file, general_identifier, phenotype_id, germinatebase_id, experiment_id, dataset_id, short_name, phenotype_value) %>%
   mutate(trait = sapply(strsplit(short_name, ";"), function(l) l[1])) %>%
   mutate(date = sapply(strsplit(short_name, ";"), function(l) l[2])) %>%
@@ -60,6 +61,9 @@ dat <- filter(df, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") 
   mutate(value = as.numeric(paste(value))) %>%
   mutate(dataset = tables$datasets$description[match(dataset_id, tables$datasets$id)])
 
+## clean up workspace
+rm(list = c('dat_init','con','tables','table_names','rq_tables'))
+
 ```
 
 ### Results
@@ -67,7 +71,7 @@ dat <- filter(df, sapply(strsplit(short_name,";"), function(l) l[1]) == "NDVI") 
 View initial dataframe. 
 
 ```{r, results='markup'}
-head(dat)
+head(dat, n=3)
 ```
 
 As an initial exploratory exercise, we can produce a heatmap to look at individual growth behaviours.
@@ -105,7 +109,7 @@ pheatmap(mat = my_mat,
 
 The data appear to group into 4 temporal behaviours.
 
-We can also plot raw NDVI values with generic polynomial fits (2nd order and loess). 
+We can also plot raw NDVI values with a generic loess polynomial fit. 
 
 ```{r}
 ### plot jitter
@@ -113,49 +117,73 @@ ggplot(dat, aes(x=date, y=value)) +
   geom_jitter() + 
   facet_wrap(~dataset) + 
   geom_smooth(method='loess') +
-  geom_smooth(method="lm", formula = y ~ poly(x, 2, raw=T), color = "salmon") +
   scale_y_continuous(name = "NDVI") +
   scale_x_date(name = "Measuring date") +
   ggtitle("NDVI data") +
   theme(legend.position = "none")
-
 ```
 
-Polynomial models clearly do *not* appropriately describe the growth behaviour observed and are discouraged in modelling growth rates (Paine et al 2012). Instead, we will utilize two non-linear growth models to model absolute growth rate (AGR) and relative growth rate (RGR) with *asymptotic fits*:
+## Plant growth modelling
 
-1. _*logistic*_ model
-  - AGR = $\frac{rM_{0}Ke^{-rt}(K - M_{0})}{(M_{0} + e^{-rt}(K - M_{0}))^{2}}$
-  - RGR (time)
-  - RGR (mass)
-2. _*Gompertz*_ model
-  - AGR = $rKe^{-rt}(\frac{M_{0}}{K})^{e^{-rt}} ln\frac{K}{M_{0}}$
-  - RGR (time)
-  - RGR (mass)
+Polynomial models are clearly *not* appropriate for plant growth modelling and are thus discouraged (Paine et al 2012). Instead, we will attempt to fit various asymptotic non-linear models:
 
-Which fitting routine to use [nls, gnls, nlsList, or nlme]? If you have no treatment effects, ie, a model of the form y ~ x, use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+1. *Monomolecular*
+2. *3-P Logistic*
+3. *4-P Logistic*
 
-```{r}
+Which fitting routine to use [nls, _gnls_, nlsList, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+
+```{r setup mdl data, include=FALSE}
 library(nlme)
-
-## for now just to 2018 GES Extras which has plant plot ids
-df <- filter(dat, source_file == "2018_GES_Extras_Lidar.csv") %>% 
+df <- dat %>%
   rename(X=date, Y=value, pp=general_identifier) %>% 
   mutate(X_num = as.numeric(X)) %>%
   select(Y,X,pp,X_num)
 
-## fit logistic model using nls
-fit.logis  <- nls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df)
-summary(fit.logis)
-plot(fit.logis)
-logLik(fit.logis)
-AIC(fit.logis)
-
-## fit logistic model using nlme
-# assign data groups
-df_asymp_pp   <- groupedData(formula = Y ~ X_num | pp, data = df)
-fit.logis.nlme <- nlme(Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_asymp_pp, fixed = Asym + xmid + scal ~ 1)
-
+r <- range(df$X_num)
+n.preds=100
+xNew <- seq(r[1],r[2],length.out = n.preds)
 ```
 
+### Monomolecular
+
+```{r, results='markup'}
+#fit
+fit.mono <- gnls(Y ~ SSasymp(X_num, Asym, R0, lrc), data = df)
+yfitted <- predict(fit.mono, list(X_num = xNew))
+
+#plot
+plot(Y ~ X, df, ylab = "Growth (NDVI)", xlab = "Date")
+lines(xNew, yfitted, col = 'red') 
+mtext("Monomolecular model", font=3, padj = -1)
+```
+
+### 3-parameter Logistic
+
+```{r, results='markup'}
+#fit
+fit.logis  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df)
+yfitted <- predict(fit.logis, list(X_num = xNew))
+#with variance function
+fit.logis.var <- gnls(Y ~ SSlogis(X_num, Asym, xmid, scal), data = df, weights= varExp(form = ~ fitted(.)))
+yfitted2 <- predict(fit.logis.var, list(X_num = xNew))
+
+#plot
+plot(Y ~ X, df, ylab = "Growth (NDVI)", xlab = "Date")
+lines(xNew, yfitted, col = 'red')
+lines(xNew, yfitted2, col = 'blue') 
+mtext("3-P Logistic models", font=3, padj = -1)
+```
+
+### Comparison
+
+Compare measures of model fit and residual plots for each model produced
+
+```{r, echo=FALSE, results='markup'}
+anova(fit.mono, fit.logis, fit.logis.var)
+plot(fit.mono, main='Monomolecular')
+plot(fit.logis, main='Logistic')
+plot(fit.logis.var, main='Logistic with variance function')
+```
 
 

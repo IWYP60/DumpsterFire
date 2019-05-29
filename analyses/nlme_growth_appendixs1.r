@@ -194,7 +194,9 @@ grid.search.pow <- function(lim_lo, lim_hi, len, X, Y){
 
 
 
-# The following three functions transform the parameters of the logistic, gompertz and monomolecular models (respectively), to put them onto a scale most easily comprable with the other models.
+# The following three functions transform the parameters of the logistic,
+# gompertz and monomolecular models (respectively), to put them onto a scale
+# most easily comprable with the other models.
 transform_param.logis <- function(coef){
 	K = coef[1]
 	r = 1/(coef[3])
