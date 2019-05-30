@@ -68,17 +68,10 @@ rm(list = c('dat_init','con','tables','table_names','rq_tables'))
 
 ### Results
 
-View initial dataframe. 
-
-```{r, results='markup'}
-head(dat, n=3)
-```
-
 As an initial exploratory exercise, we can produce a heatmap to look at individual growth behaviours.
 
 ```{r}
 library(pheatmap)
-library(ggforce)
 
 ## make numeric matrix and heatmap
 my_mat <- select(dat, germinatebase_id, date, value) %>%
@@ -112,6 +105,9 @@ The data appear to group into 4 temporal behaviours.
 We can also plot raw NDVI values with a generic loess polynomial fit. 
 
 ```{r}
+library(ggplot2)
+library(patchwork)
+
 ### plot jitter
 ggplot(dat, aes(x=date, y=value)) + 
   geom_jitter() + 
@@ -129,61 +125,216 @@ Polynomial models are clearly *not* appropriate for plant growth modelling and a
 
 1. *Monomolecular*
 2. *3-P Logistic*
-3. *4-P Logistic*
 
-Which fitting routine to use [nls, _gnls_, nlsList, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+*N.B. 4-P logistic and Gompertz models would not converge.*
+
+Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
 
 ```{r setup mdl data, include=FALSE}
 library(nlme)
-df <- dat %>%
-  rename(X=date, Y=value, pp=general_identifier) %>% 
-  mutate(X_num = as.numeric(X)) %>%
-  select(Y,X,pp,X_num)
 
-r <- range(df$X_num)
+df <- dat %>%
+  rename(X=date, Y=value, group=general_identifier) %>% 
+  mutate(X_num = as.numeric(X)) %>%
+  mutate(dataset = sapply(strsplit(dataset, " "), function(l) l[1])) %>%
+  select(Y,X,group,X_num, dataset) %>% 
+  mutate(logY = log10(Y)) %>%
+  filter(X != "2018-11-16") # remove last data point
+
+df_exk <- subset(df, dataset == "GES18_ExKsub")
+df_ext <- subset(df, dataset == "GES18_Extras")
+
 n.preds=100
+r <- range(df$X_num)
 xNew <- seq(r[1],r[2],length.out = n.preds)
+```
+
+Starting dataframes for regression
+
+```{r, results='markup'}
+head(df_exk, n =4)
+head(df_ext, n =4)
 ```
 
 ### Monomolecular
 
 ```{r, results='markup'}
 #fit
-fit.mono <- gnls(Y ~ SSasymp(X_num, Asym, R0, lrc), data = df)
-yfitted <- predict(fit.mono, list(X_num = xNew))
+fit.mono.exk <- gnls(logY ~ SSasymp(X_num, Asym, R0, lrc), data = df_exk)
+yfitted.exk <- predict(fit.mono.exk, list(X_num = xNew))
+
+fit.mono.ext <- gnls(logY ~ SSasymp(X_num, Asym, R0, lrc), data = df_ext)
+yfitted.ext <- predict(fit.mono.ext, list(X_num = xNew))
+
+par(mfrow = c(1, 2))
 
 #plot
-plot(Y ~ X, df, ylab = "Growth (NDVI)", xlab = "Date")
-lines(xNew, yfitted, col = 'red') 
-mtext("Monomolecular model", font=3, padj = -1)
+plot(logY ~ X, df_exk, ylab = "log10 NDVI", xlab = "Date")
+lines(xNew, yfitted.exk, col = 'red')
+mtext("GES18 ExK", font=3, padj = -1)
+
+plot(logY ~ X, df_ext, ylab = "log10 NDVI", xlab = "Date")
+lines(xNew, yfitted.ext, col = 'red')
+mtext("GES18 Extras", font=3, padj = -1)
 ```
 
 ### 3-parameter Logistic
 
 ```{r, results='markup'}
 #fit
-fit.logis  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df)
-yfitted <- predict(fit.logis, list(X_num = xNew))
-#with variance function
-fit.logis.var <- gnls(Y ~ SSlogis(X_num, Asym, xmid, scal), data = df, weights= varExp(form = ~ fitted(.)))
-yfitted2 <- predict(fit.logis.var, list(X_num = xNew))
+fit.logis.exk  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_exk)
+yfitted.exk <- predict(fit.logis.exk, list(X_num = xNew))
+
+fit.logis.ext  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_ext)
+yfitted.ext <- predict(fit.logis.ext, list(X_num = xNew))
+
+par(mfrow = c(1,2))
 
 #plot
-plot(Y ~ X, df, ylab = "Growth (NDVI)", xlab = "Date")
-lines(xNew, yfitted, col = 'red')
-lines(xNew, yfitted2, col = 'blue') 
-mtext("3-P Logistic models", font=3, padj = -1)
+plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted.exk, col = 'red')
+mtext("GES18 ExK", font=3, padj = -1)
+
+plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted.ext, col = 'red')
+mtext("GES18 Extras", font=3, padj = -1)
+
 ```
 
-### Comparison
+### Compare models
 
-Compare measures of model fit and residual plots for each model produced
+Visualize scaled residuals and model fits for each model.
 
 ```{r, echo=FALSE, results='markup'}
-anova(fit.mono, fit.logis, fit.logis.var)
-plot(fit.mono, main='Monomolecular')
-plot(fit.logis, main='Logistic')
-plot(fit.logis.var, main='Logistic with variance function')
+p1 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.mono.exk), y=residuals(fit.mono.exk)/sd(residuals(fit.mono.exk)))) +
+  ggtitle("Monomolecular GES18 ExK") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p2 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.mono.ext), y=residuals(fit.mono.ext)/sd(residuals(fit.mono.ext)))) +
+  ggtitle("Monomolecular GES18 Extras") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p3 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
+  ggtitle("3P Logistic GES18 ExK") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p4 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.logis.ext), y=residuals(fit.logis.ext)/sd(residuals(fit.logis.ext)))) +
+  ggtitle("3P Logistic GES18 Extras") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p1 + p2 + p3 + p4
+
+out <- rbind(c("Monomolecular exk", round(fit.mono.exk$logLik)),
+             c("Logistic exk", round(fit.logis.exk$logLik)),
+             c("Monomolecular ext", round(fit.mono.ext$logLik)),
+             c("Logistic ext", round(fit.logis.ext$logLik))
+)
+
+colnames(out) <- c("Model", "logLik")
+out
 ```
+
+Interestingly, the monomolecular fit appears to fit best, however, the model form is not ideal for modelling plant growth (e.g. no point of inflexion, can predict negative biomass). The 3P logistic fit is more commonly used form as it has a point of inflexion and is a relatively flexible and parsimonious model. We can continue modelling using the 3P logistic model with *SSlogis* to improve the model fit. We can include a dummy time-point at T=0 and see if the model converged on log10 transformed data. A 4-P logistic model gives greater flexibility and can help explain greater variance. It did not converge previously, however, the inclusion of T=0 may facilitate parsimony.
+
+```{r, include=FALSE}
+dummy <- NULL
+for(i in unique(interaction(df$group, df$dataset))){
+  a <- tibble(Y=0, X=as.Date("2018-07-01"), 
+              logY=log10(0.01),
+              group=sapply(strsplit(i, "\\."), function(l) l[1]),
+              X_num = as.numeric(X),
+              dataset= sapply(strsplit(i, "\\."), function(l) l[2]))
+  dummy <- rbind(dummy, a)
+}
+
+new_df <- rbind(df, dummy)
+
+df_exk <- subset(new_df, dataset == "GES18_ExKsub")
+df_ext <- subset(new_df, dataset == "GES18_Extras")
+
+n.preds=100
+r <- range(new_df$X_num)
+xNew <- seq(r[1],r[2],length.out = n.preds)
+```
+
+```{r, results='markup'}
+#fit
+fit.logis.exk  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_exk)
+yfitted.exk <- predict(fit.logis.exk, list(X_num = xNew))
+
+fit.logis.ext  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_ext)
+yfitted.ext <- predict(fit.logis.ext, list(X_num = xNew))
+
+fit.fpl.exk <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = df_exk)
+yfitted2.exk <- predict(fit.fpl.exk, list(X_num = xNew))
+
+fit.fpl.ext <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = df_ext)
+yfitted2.ext <- predict(fit.fpl.ext, list(X_num = xNew))
+
+par(mfrow = c(2,2))
+
+#plot
+plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted.exk, col = 'red')
+mtext("3P GES18 ExK", font=3, padj = -1)
+
+plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted.ext, col = 'red')
+mtext("3P GES18 Extras", font=3, padj = -1)
+
+plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted2.exk, col = 'red')
+mtext("4P GES18 ExK", font=3, padj = -1)
+
+plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
+lines(xNew, yfitted2.ext, col = 'red')
+mtext("4P GES18 Extras", font=3, padj = -1)
+
+```
+
+```{r, echo=FALSE, results='markup'}
+p1 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
+  ggtitle("3P GES18 ExK") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p2 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.logis.ext), y=residuals(fit.logis.ext)/sd(residuals(fit.logis.ext)))) +
+  ggtitle("3P GES18 Extras") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p3 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.fpl.exk), y=residuals(fit.fpl.exk)/sd(residuals(fit.fpl.exk)))) +
+  ggtitle("4P GES18 ExK") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p4 <- ggplot() + 
+  geom_point(aes(x=fitted(fit.fpl.ext), y=residuals(fit.fpl.ext)/sd(residuals(fit.fpl.ext)))) +
+  ggtitle("4P GES18 Extras") +
+  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
+
+p1 + p2 + p3 + p4
+
+out <- rbind(c("3P ExK", fit.logis.exk$logLik),
+             c("3P Extras", fit.logis.ext$logLik),
+             c("4P ExK", fit.fpl.exk$logLik),
+             c("4P Extras", fit.fpl.ext$logLik)
+)
+
+colnames(out) <- c("Model", "logLik")
+out
+```
+
+#### Caluclating AGR, RGRt, RGRm
+
+So the 3P logistic may be the "best fit" 
+
+Aim: We want to determine AGR, RGRm, RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZ"). For this, we will need *nlme* to converge so we can assign plot ID as a fixed effect and also include spatial info as random (TBD). 
+
+
 
 
