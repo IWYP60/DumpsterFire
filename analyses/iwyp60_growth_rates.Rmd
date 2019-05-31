@@ -243,7 +243,7 @@ Interestingly, the monomolecular fit appears to fit best, however, the model for
 ```{r, include=FALSE}
 dummy <- NULL
 for(i in unique(interaction(df$group, df$dataset))){
-  a <- tibble(Y=0, X=as.Date("2018-07-08"), 
+  a <- tibble(Y = 0, X=as.Date("2018-07-08"), 
               logY=log10(0.01),
               group=sapply(strsplit(i, "\\."), function(l) l[1]),
               X_num = as.numeric(X),
@@ -329,14 +329,14 @@ colnames(out) <- c("Model", "logLik")
 out
 ```
 
-#### Caluclating AGR, RGRt, RGRm
+#### NLS Regression per plant plot ID
 
 Continue with the 3P logistic model. Use this to determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv"). For this, we will need *nlme* to converge so we can assign plot ID as a fixed effect and also include spatial info as random (TBD). 
 
 ```{r, results='markup'}
 ## model IDs in GES18 ExK
 ## need to use getInitial to get initial estimates which allows model to converge
-## use tryCatch() to deal with samples that don't converge
+## use tryCatch() to deal with non-convergence
 
 par(mfrow = c(3,3))
 
@@ -344,23 +344,63 @@ par(mfrow = c(3,3))
 for(i in sample(1:length(unique(df_exk$group)), size = 9, replace = FALSE)){
   tryCatch({
       id <- unique(df_exk$group)[i]
-  a <- subset(df_exk, group == id)
-  tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
-  fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
-  yfitted <- predict(fit, list(X_num = xNew))
+      a <- subset(df_exk, group == id)
+      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
+      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
+      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X_num = xNew))
+      
+      plot(Y ~ X, a, ylab = "NDVI", xlab = "Date", ylim = c(0,.8))
+      lines(xNew, yfitted, col = 'red')
+      mtext(paste(id), font=3, padj = -1)
+      
+  }, 
+  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
   
-  plot(Y ~ X, a, ylab = "NDVI", xlab = "Date")
-  lines(xNew, yfitted, col = 'red')
-  mtext(paste(id), font=3, padj = -1)
-  }, error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
 }
-  
 
+# logLik on last plot
+logLik(fit)
 
 ```
 
+```{r, results='markup'}
+## model IDs in GES18 Extras
 
-```{r}
+par(mfrow = c(3,3))
+
+# plot and fit to 9 random accessions
+for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
+  tryCatch({
+      id <- unique(df_ext$group)[i]
+      a <- subset(df_ext, group == id)
+      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
+      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
+      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X_num = xNew))
+      
+      plot(Y ~ X, a, ylab = "NDVI", xlab = "Date", ylim = c(0,.8))
+      lines(xNew, yfitted, col = 'red')
+      mtext(paste(id), font=3, padj = -1)
+      
+  }, 
+  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
+  
+}
+
+# logLik on last plot
+logLik(fit)
+```
+
+Both 3P and 4P models converge for individual plant plot IDs (or Accession IDs) and having similar log likelihood values (goodness of fit). Therefore, we can continue with either to produce coefficients on a plant plot basis to use to estimate RGR and AGR. For simplicity, the above code and the following analysis using the 3P logistic model. 
+
+#### Collate coefficients for models per plant plot ID 
+
+Assemble coefficients for all plant plot/accessions ideas for the entire GES18 campaign. Any IDs for which the model does not converge are ignored and dropped.
+
+```{r, results='markup'}
 # transform paramters of logistic model
 transform_param.logis <- function(coef){
 	K = coef[1]
@@ -373,7 +413,71 @@ transform_param.logis <- function(coef){
 		}
 	names(out) <- c("K", "r", "M0")
 	return(out)
-	}
+}
+
+cfs <- NULL
+
+for(i in 1:length(unique(new_df$group))){
+  tryCatch({
+      id <- unique(new_df$group)[i]
+      a <- subset(new_df, group == id)
+      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
+      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
+      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      x <- transform_param.logis(coef(fit))
+      tmp2 <- tibble(id = id, K=x[1], r=x[2], M0 = x[3])
+      cfs <- rbind(cfs, tmp2)
+  }, error = function(e) {})
+}
+
+head(cfs)
+
+p1 <- ggplot(data = cfs) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
+p2 <- ggplot(data = cfs) + geom_histogram(aes(x=r), fill = "dodgerblue", colour='black') 
+
+p1 + p2
+
+```
+
+#### Predictions on RGRm and AGR
+
+Before trying to make predictions, we also want to make sure we can propagate error in parameter estimates into growth rate estimates. Before propagating error, we need to check that the parameter profiles are approximately V-shaped (and that the sampling intervals of the parameters are therefore approximately multivariate normal) before proceeding.
+
+```{r}
+tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = new_df)
+fit  <- nls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = new_df, start=tmp)
+
+par(mfrow=c(2,2))
+
+plot(profile(fit))
+```
+
+Profiles are v-shaped.
+
+```{r, eval=FALSE}
+times = unique(new_df$X_num)
+newTime = abs(min(times) - times)
+
+rates <- NULL
+
+# for(i in cfs$id){
+
+i = "IW_P04899"
+  K <- cfs$K[cfs$id == i]
+  M0 = 0.01 ## hacky hack M0 = 0 is a problem .... double check right eqn
+  r <- cfs$r[cfs$id == i]
+  tmp <- tibble(
+    time = newTime,
+    M = (M0*K)/(M0+(K-M0)*exp(-r*times)),
+    AGR = (r*M0*K*(K-M0)*exp(-r*times))/(M0+(K-M0)*exp(-r*times))^2)
+	tmp$RGRt <- rates$AGR/rates$M
+	tmp$RGRm <- r*(1 - rates$M/K)
+  
+# }
+
+tmp
+	
 ```
 
 
