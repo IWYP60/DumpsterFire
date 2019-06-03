@@ -124,11 +124,12 @@ ggplot(dat, aes(x=date, y=value)) +
 Polynomial models are clearly *not* appropriate for plant growth modelling and are thus discouraged (Paine et al 2012). Instead, we will attempt to fit various asymptotic non-linear models:
 
 1. *Monomolecular*
-2. *3-P Logistic*
+2. *3P logistic*
+3. *4P logistic*
 
-*N.B. 4-P logistic and Gompertz models would not converge.*
+*N.B. Gompertz models would not converge and 4P had limited convergence*
 
-Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinhero & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinheiro & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
 
 ```{r setup mdl data, include=FALSE}
 library(nlme)
@@ -137,10 +138,10 @@ df <- dat %>%
   rename(X=date, Y=value, group=general_identifier) %>% 
   mutate(X_num = as.numeric(X)) %>%
   mutate(dataset = sapply(strsplit(dataset, " "), function(l) l[1])) %>%
-  select(Y,X,group,X_num, dataset) %>% 
-  mutate(logY = log10(Y)) %>%
-  filter(X != "2018-11-16") # remove last data point
-
+  filter(X != "2018-11-16") %>% # remove last data point to help convergence
+  select(Y,X,X_num,group,dataset) %>% 
+  mutate(logY = log10(Y))
+  
 df_exk <- subset(df, dataset == "GES18_ExKsub")
 df_ext <- subset(df, dataset == "GES18_Extras")
 
@@ -251,46 +252,52 @@ for(i in unique(interaction(df$group, df$dataset))){
   dummy <- rbind(dummy, a)
 }
 
-new_df <- rbind(df, dummy)
+## convert date to days for meaningful rates
+new_df <- rbind(dummy, df) %>%
+  mutate(days = lubridate::interval(min(X),X)) %>%
+  mutate(days = lubridate::as.duration(days)) %>%
+  mutate(days = as.numeric(days)/60/60/24) %>%
+  mutate(X=days) %>%
+  select(-X_num, -days)
 
 df_exk <- subset(new_df, dataset == "GES18_ExKsub")
 df_ext <- subset(new_df, dataset == "GES18_Extras")
 
 n.preds=100
-r <- range(new_df$X_num)
+r <- range(new_df$X)
 xNew <- seq(r[1],r[2],length.out = n.preds)
 ```
 
 ```{r, results='markup'}
 #fit
-fit.logis.exk  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_exk)
-yfitted.exk <- predict(fit.logis.exk, list(X_num = xNew))
+fit.logis.exk  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_exk)
+yfitted.exk <- predict(fit.logis.exk, list(X = xNew))
 
-fit.logis.ext  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_ext)
-yfitted.ext <- predict(fit.logis.ext, list(X_num = xNew))
+fit.logis.ext  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext)
+yfitted.ext <- predict(fit.logis.ext, list(X = xNew))
 
-fit.fpl.exk <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = df_exk)
-yfitted2.exk <- predict(fit.fpl.exk, list(X_num = xNew))
+fit.fpl.exk <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_exk)
+yfitted2.exk <- predict(fit.fpl.exk, list(X = xNew))
 
-fit.fpl.ext <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = df_ext)
-yfitted2.ext <- predict(fit.fpl.ext, list(X_num = xNew))
+fit.fpl.ext <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext)
+yfitted2.ext <- predict(fit.fpl.ext, list(X = xNew))
 
 par(mfrow = c(2,2))
 
 #plot
-plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
+plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Days")
 lines(xNew, yfitted.exk, col = 'red')
 mtext("3P GES18 ExK", font=3, padj = -1)
 
-plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
+plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Days")
 lines(xNew, yfitted.ext, col = 'red')
 mtext("3P GES18 Extras", font=3, padj = -1)
 
-plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
+plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Days")
 lines(xNew, yfitted2.exk, col = 'red')
 mtext("4P GES18 ExK", font=3, padj = -1)
 
-plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
+plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Days")
 lines(xNew, yfitted2.ext, col = 'red')
 mtext("4P GES18 Extras", font=3, padj = -1)
 
@@ -335,8 +342,7 @@ Continue with the 3P logistic model. Use this to determine AGR, RGRm, and RGRt *
 
 ```{r, results='markup'}
 ## model IDs in GES18 ExK
-## need to use getInitial to get initial estimates which allows model to converge
-## use tryCatch() to deal with non-convergence
+## estimate initial coefs with "getInitial" helps gnls to converge
 
 par(mfrow = c(3,3))
 
@@ -345,13 +351,13 @@ for(i in sample(1:length(unique(df_exk$group)), size = 9, replace = FALSE)){
   tryCatch({
       id <- unique(df_exk$group)[i]
       a <- subset(df_exk, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
-      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
-      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      yfitted <- predict(fit, list(X_num = xNew))
+      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
+      # tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
+      # fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X = xNew))
       
-      plot(Y ~ X, a, ylab = "NDVI", xlab = "Date", ylim = c(0,.8))
+      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
       lines(xNew, yfitted, col = 'red')
       mtext(paste(id), font=3, padj = -1)
       
@@ -375,13 +381,13 @@ for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
   tryCatch({
       id <- unique(df_ext$group)[i]
       a <- subset(df_ext, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
-      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
-      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      yfitted <- predict(fit, list(X_num = xNew))
+      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
+      # tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
+      # fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X = xNew))
       
-      plot(Y ~ X, a, ylab = "NDVI", xlab = "Date", ylim = c(0,.8))
+      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
       lines(xNew, yfitted, col = 'red')
       mtext(paste(id), font=3, padj = -1)
       
@@ -415,69 +421,157 @@ transform_param.logis <- function(coef){
 	return(out)
 }
 
-cfs <- NULL
+cfs_logis <- NULL
 
 for(i in 1:length(unique(new_df$group))){
   tryCatch({
       id <- unique(new_df$group)[i]
       a <- subset(new_df, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = a, start=tmp)
-      # tmp <- getInitial(Y ~ SSfpl(X_num, A, B, xmid, scal), data = a) #4p logistic
-      # fit  <- gnls( Y ~ SSfpl(X_num, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
+      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
       x <- transform_param.logis(coef(fit))
       tmp2 <- tibble(id = id, K=x[1], r=x[2], M0 = x[3])
-      cfs <- rbind(cfs, tmp2)
+      cfs_logis <- rbind(cfs_logis, tmp2)
   }, error = function(e) {})
 }
 
-head(cfs)
+p1 <- ggplot(data = cfs_logis) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
+p2 <- ggplot(data = cfs_logis) + geom_histogram(aes(x=r), fill = "dodgerblue", colour='black') 
+p3 <- ggplot(data = cfs_logis) + geom_histogram(aes(x=M0), fill = "goldenrod", colour='black') 
 
-p1 <- ggplot(data = cfs) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
-p2 <- ggplot(data = cfs) + geom_histogram(aes(x=r), fill = "dodgerblue", colour='black') 
-
-p1 + p2
+p1 + p2 + p3
 
 ```
 
-#### Predictions on RGRm and AGR
+Having M0 = 0 is problematic and messes up the maths for obtaining growth rates. 4P logistic does *not* appear to result in M0 = 0. So, we could probably obtain some growth rate estimates with that.
+
+```{r}
+## try 4p model
+par(mfrow = c(3,3))
+
+# plot and fit to 9 random accessions
+for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
+  tryCatch({
+      id <- unique(df_ext$group)[i]
+      a <- subset(df_ext, group == id)
+      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
+      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X = xNew))
+      
+      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
+      lines(xNew, yfitted, col = 'red')
+      mtext(paste(id), font=3, padj = -1)
+      
+  }, 
+  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
+  
+}
+
+# logLik on last plot
+logLik(fit)
+
+## fit fpl on all accessions and extract coefficients based on Paine et al 2012.
+cfs_fpl <- NULL
+
+for(i in 1:length(unique(new_df$group))){
+  tryCatch({
+      id <- unique(new_df$group)[i]
+      a <- subset(new_df, group == id)
+      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
+      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      x <- coef(fit)
+      tmp2 <- tibble(id = id, M0=x[1], K=x[2], xmid=x[3], r = x[4])
+      cfs_fpl <- rbind(cfs_fpl, tmp2)
+  }, error = function(e) {})
+}
+
+p1 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
+p2 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=r), fill = "dodgerblue", colour='black')
+p4 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=xmid), fill = "forestgreen", colour='black')
+p3 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=M0), fill = "goldenrod", colour='black')
+
+p1 + p2 + p4 + p3
+```
 
 Before trying to make predictions, we also want to make sure we can propagate error in parameter estimates into growth rate estimates. Before propagating error, we need to check that the parameter profiles are approximately V-shaped (and that the sampling intervals of the parameters are therefore approximately multivariate normal) before proceeding.
 
 ```{r}
-tmp <- getInitial(Y ~ SSlogis(X_num, Asym, xmid, scal), data = new_df)
-fit  <- nls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = new_df, start=tmp)
+tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext)
+fit  <- nls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext, start=tmp)
 
 par(mfrow=c(2,2))
 
 plot(profile(fit))
 ```
 
-Profiles are v-shaped.
+> Profiles are v-shaped (also for 3P; not shown above).
 
-```{r, eval=FALSE}
-times = unique(new_df$X_num)
-newTime = abs(min(times) - times)
+#### Extract AGR and RGR using 4P fit
 
+```{r, include=FALSE}
 rates <- NULL
+cfs <- cfs_fpl # use 4p logistic results
 
-# for(i in cfs$id){
+for(i in cfs$id){
+  tmp_rates <- tibble(
+    id = i,
+    K = cfs$K[cfs$id == i],
+    M0 = cfs$M0[cfs$id == i],
+    xmid = cfs$xmid[cfs$id == i],
+    r = cfs$r[cfs$id == i],
+    times = unique(new_df$X),
+    ex = exp((xmid-times)/r),
+    M  = M0+(K-M0)/(1+ex),           
+    AGR  = ((K-M0)*ex)/(r*(1+ex)^2),
+    RGRt = AGR/M,
+    RGRm = ((M0-M)*(K-M))/(r*M*(M0-K))
+  )
 
-i = "IW_P04899"
-  K <- cfs$K[cfs$id == i]
-  M0 = 0.01 ## hacky hack M0 = 0 is a problem .... double check right eqn
-  r <- cfs$r[cfs$id == i]
-  tmp <- tibble(
-    time = newTime,
-    M = (M0*K)/(M0+(K-M0)*exp(-r*times)),
-    AGR = (r*M0*K*(K-M0)*exp(-r*times))/(M0+(K-M0)*exp(-r*times))^2)
-	tmp$RGRt <- rates$AGR/rates$M
-	tmp$RGRm <- r*(1 - rates$M/K)
+  rates <- rbind(rates, tmp_rates)
+}
+
+```
+
+#### Take random ID and plot all data together (NDVI, RGR, AGR)
+
+```{r, results='markup'}
+head(rates, n=3)
+
+par(mfrow=c(2,2))
+
+# plot and fit to 9 random accessions
+for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
+  tryCatch({
+      Id <- unique(new_df$group)[i]
+      a <- subset(new_df, group == Id)
+      
+      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
+      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
+      yfitted <- predict(fit, list(X = xNew))
+      
+      # "biomass"
+      plot(Y ~ X, data = a, ylab = "NDVI", xlab = "", ylim = c(0,.8))
+      lines(xNew, yfitted, col = 'red')
+      mtext(paste(Id), font=3, padj = -1)
+      
+      b <- subset(rates, id == Id)
+      
+      # AGR
+      plot(AGR ~ times, data=b, type = "n", xlab='', ylab = expression(paste("AGR ", (unit^-1%.%day^-1))))
+      lines(AGR ~ times, data = b)
+      
+      # RGRt
+      plot(RGRt ~ times, data=b, type = "n", xlab='', ylab = expression(paste("RGR ", (g%.%g^-1%.%day^-1))))
+      lines(RGRt ~ times, data = b)
+      
+      # RGRm
+      plot(RGRm ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
+      lines(RGRm ~ times, data = b)
+  }, 
+  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
   
-# }
+}
 
-tmp
-	
 ```
 
 
