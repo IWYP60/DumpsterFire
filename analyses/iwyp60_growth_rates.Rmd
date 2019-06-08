@@ -5,18 +5,16 @@ date: "21/05/2019"
 output: html_document
 ---
 
-### Aim 
-Explore growth rates across IWYP field trial data.
+## Aim 
+Calculate growth rates from NDVI data.
 
-### Method
-
+## Method
 Utilise measures of Normalized Vegetation Index (NDVI, Greenseeker) to estimate growth rates using a nonlinear modelling approach [Paine et al 2012](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00155.x).
-
 
 Also see [Fitting von Bertalanffy Growth Function](http://rpubs.com/lacs/1123) and [fishR](http://derekogle.com/fishR/examples/oldFishRVignettes/VonBertalanffy.pdf).
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, warning = FALSE, message = FALSE, results = 'asis')
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, warning = FALSE, message = FALSE)
 
 library(tidyverse)
 library(DBI) ## functions to interface with databases
@@ -66,8 +64,7 @@ rm(list = c('dat_init','con','tables','table_names','rq_tables'))
 
 ```
 
-### Results
-
+## Results
 As an initial exploratory exercise, we can produce a heatmap to look at individual growth behaviours.
 
 ```{r}
@@ -100,7 +97,7 @@ pheatmap(mat = my_mat,
 
 ```
 
-The data appear to group into 4 temporal behaviours.
+We can arbitrarily group the data into 4 temporal patterns (cutree algorithm). Interestingly, the data doesn't completely separate by panel.
 
 We can also plot raw NDVI values with a generic loess polynomial fit. 
 
@@ -119,17 +116,14 @@ ggplot(dat, aes(x=date, y=value)) +
   theme(legend.position = "none")
 ```
 
-## Plant growth modelling
+Polynomial models are clearly *not* appropriate for plant growth modelling and are thus discouraged (Paine et al 2012). Instead, we will attempt to fit asymptotic non-linear models:
 
-Polynomial models are clearly *not* appropriate for plant growth modelling and are thus discouraged (Paine et al 2012). Instead, we will attempt to fit various asymptotic non-linear models:
+1. *3P logistic*
+2. *4P logistic*
 
-1. *Monomolecular*
-2. *3P logistic*
-3. *4P logistic*
+*N.B. Gompertz would not converge*
 
-*N.B. Gompertz models would not converge and 4P had limited convergence*
-
-Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinheiro & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. Use nlsList to fit a series of nls models (this is rarely useful in practice. Rather, you probably want to use nlme) nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
+Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinheiro & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
 
 ```{r setup mdl data, include=FALSE}
 library(nlme)
@@ -138,7 +132,7 @@ df <- dat %>%
   rename(X=date, Y=value, group=general_identifier) %>% 
   mutate(X_num = as.numeric(X)) %>%
   mutate(dataset = sapply(strsplit(dataset, " "), function(l) l[1])) %>%
-  filter(X != "2018-11-16") %>% # remove last data point to help convergence
+  filter(X != "2018-11-16") %>%
   select(Y,X,X_num,group,dataset) %>% 
   mutate(logY = log10(Y))
   
@@ -150,38 +144,9 @@ r <- range(df$X_num)
 xNew <- seq(r[1],r[2],length.out = n.preds)
 ```
 
-Starting dataframes for regression
+### Exploratory modelling with the 3-parameter logistic
 
-```{r, results='markup'}
-head(df_exk, n =4)
-head(df_ext, n =4)
-```
-
-### Monomolecular
-
-```{r, results='markup'}
-#fit
-fit.mono.exk <- gnls(logY ~ SSasymp(X_num, Asym, R0, lrc), data = df_exk)
-yfitted.exk <- predict(fit.mono.exk, list(X_num = xNew))
-
-fit.mono.ext <- gnls(logY ~ SSasymp(X_num, Asym, R0, lrc), data = df_ext)
-yfitted.ext <- predict(fit.mono.ext, list(X_num = xNew))
-
-par(mfrow = c(1, 2))
-
-#plot
-plot(logY ~ X, df_exk, ylab = "log10 NDVI", xlab = "Date")
-lines(xNew, yfitted.exk, col = 'red')
-mtext("GES18 ExK", font=3, padj = -1)
-
-plot(logY ~ X, df_ext, ylab = "log10 NDVI", xlab = "Date")
-lines(xNew, yfitted.ext, col = 'red')
-mtext("GES18 Extras", font=3, padj = -1)
-```
-
-### 3-parameter Logistic
-
-```{r, results='markup'}
+```{r}
 #fit
 fit.logis.exk  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_exk)
 yfitted.exk <- predict(fit.logis.exk, list(X_num = xNew))
@@ -202,21 +167,9 @@ mtext("GES18 Extras", font=3, padj = -1)
 
 ```
 
-### Compare models
-
 Visualize scaled residuals and model fits for each model.
 
-```{r, echo=FALSE, results='markup'}
-p1 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.mono.exk), y=residuals(fit.mono.exk)/sd(residuals(fit.mono.exk)))) +
-  ggtitle("Monomolecular GES18 ExK") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p2 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.mono.ext), y=residuals(fit.mono.ext)/sd(residuals(fit.mono.ext)))) +
-  ggtitle("Monomolecular GES18 Extras") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
+```{r, echo=FALSE}
 p3 <- ggplot() + 
   geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
   ggtitle("3P Logistic GES18 ExK") +
@@ -227,11 +180,9 @@ p4 <- ggplot() +
   ggtitle("3P Logistic GES18 Extras") +
   scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
 
-p1 + p2 + p3 + p4
+p3 + p4
 
-out <- rbind(c("Monomolecular exk", round(fit.mono.exk$logLik)),
-             c("Logistic exk", round(fit.logis.exk$logLik)),
-             c("Monomolecular ext", round(fit.mono.ext$logLik)),
+out <- rbind(c("Logistic exk", round(fit.logis.exk$logLik)),
              c("Logistic ext", round(fit.logis.ext$logLik))
 )
 
@@ -239,7 +190,7 @@ colnames(out) <- c("Model", "logLik")
 out
 ```
 
-Interestingly, the monomolecular fit appears to fit best, however, the model form is not ideal for modelling plant growth (e.g. no point of inflexion, can predict negative biomass). The 3P logistic fit is more commonly used form as it has a point of inflexion and is a relatively flexible and parsimonious model. We can continue modelling using the 3P logistic model with *SSlogis* to improve the model fit. We can include a dummy time-point at T=0 and see if the model converged on log10 transformed data. A 4-P logistic model gives greater flexibility and can help explain greater variance. It did not converge previously, however, the inclusion of T=0 may facilitate parsimony.
+As a trial, the 3P logistic model is fitted to each dataset. It is the more commonly used form as it has a point of inflexion and is a relatively flexible and parsimonious model. We can continue modelling using the 3P logistic model with *SSlogis* to improve the model fit. We can include a dummy time-point at T=0 and see if the model converged on log10 transformed data. A 4-P logistic model gives greater flexibility and can help explain greater variance. It did not converge previously, however, the inclusion of T=0 may facilitate parsimony.
 
 ```{r, include=FALSE}
 dummy <- NULL
@@ -268,7 +219,7 @@ r <- range(new_df$X)
 xNew <- seq(r[1],r[2],length.out = n.preds)
 ```
 
-```{r, results='markup'}
+```{r}
 #fit
 fit.logis.exk  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_exk)
 yfitted.exk <- predict(fit.logis.exk, list(X = xNew))
@@ -303,7 +254,7 @@ mtext("4P GES18 Extras", font=3, padj = -1)
 
 ```
 
-```{r, echo=FALSE, results='markup'}
+```{r, echo=FALSE}
 p1 <- ggplot() + 
   geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
   ggtitle("3P GES18 ExK") +
@@ -336,25 +287,19 @@ colnames(out) <- c("Model", "logLik")
 out
 ```
 
-#### NLS Regression per plant plot ID
+### Growth rates from 3P logistic regression
+Determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv") using 3P logistic fit.
 
-Continue with the 3P logistic model. Use this to determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv"). For this, we will need *nlme* to converge so we can assign plot ID as a fixed effect and also include spatial info as random (TBD). 
-
-```{r, results='markup'}
-## model IDs in GES18 ExK
-## estimate initial coefs with "getInitial" helps gnls to converge
-
+```{r}
 par(mfrow = c(3,3))
 
 # plot and fit to 9 random accessions
-for(i in sample(1:length(unique(df_exk$group)), size = 9, replace = FALSE)){
+for(i in sample(1:length(unique(new_df$group)), size = 9, replace = FALSE)){
   tryCatch({
-      id <- unique(df_exk$group)[i]
-      a <- subset(df_exk, group == id)
+      id <- unique(new_df$group)[i]
+      a <- subset(new_df, group == id)
       tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
       fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
-      # tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
-      # fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
       yfitted <- predict(fit, list(X = xNew))
       
       plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
@@ -371,43 +316,10 @@ logLik(fit)
 
 ```
 
-```{r, results='markup'}
-## model IDs in GES18 Extras
+> 3P logistic seems parsimonious with these datasets. Can use it to assemble coefficients for all plant plot/accessions ideas for the entire GES18 campaign. Any IDs for which the model does not converge are ignored and dropped.
 
-par(mfrow = c(3,3))
-
-# plot and fit to 9 random accessions
-for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
-  tryCatch({
-      id <- unique(df_ext$group)[i]
-      a <- subset(df_ext, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
-      # tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
-      # fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      yfitted <- predict(fit, list(X = xNew))
-      
-      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
-      lines(xNew, yfitted, col = 'red')
-      mtext(paste(id), font=3, padj = -1)
-      
-  }, 
-  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
-  
-}
-
-# logLik on last plot
-logLik(fit)
-```
-
-Both 3P and 4P models converge for individual plant plot IDs (or Accession IDs) and having similar log likelihood values (goodness of fit). Therefore, we can continue with either to produce coefficients on a plant plot basis to use to estimate RGR and AGR. For simplicity, the above code and the following analysis using the 3P logistic model. 
-
-#### Collate coefficients for models per plant plot ID 
-
-Assemble coefficients for all plant plot/accessions ideas for the entire GES18 campaign. Any IDs for which the model does not converge are ignored and dropped.
-
-```{r, results='markup'}
-# transform paramters of logistic model
+```{r}
+# transform paramters of 3P logistic model
 transform_param.logis <- function(coef){
 	K = coef[1]
 	r = 1/(coef[3])
@@ -443,10 +355,82 @@ p1 + p2 + p3
 
 ```
 
-Having M0 = 0 is problematic and messes up the maths for obtaining growth rates. 4P logistic does *not* appear to result in M0 = 0. So, we could probably obtain some growth rate estimates with that.
+Check that the parameter profiles are approximately V-shaped (and that the sampling intervals of the parameters are therefore approximately multivariate normal) before proceeding.
 
 ```{r}
-## try 4p model
+tmp <- getInitial( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext)
+fit  <- nls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext, start=tmp)
+
+par(mfrow=c(2,2))
+
+plot(profile(fit))
+```
+
+> Profiles are V-shaped
+
+```{r}
+rates <- NULL
+cfs <- cfs_logis # use 3p logistic results
+
+for(i in cfs$id){
+  tmp_rates <- tibble(
+    id = i,
+    K = cfs$K[cfs$id == i],
+    M0 = cfs$M0[cfs$id == i],
+    r = cfs$r[cfs$id == i],
+    times = xNew,
+    M  = (M0*K)/(M0+(K-M0)*exp(-r*times)),           
+    AGR  = (r*M0*K*(K-M0)*exp(-r*times))/(M0+(K-M0)*exp(-r*times))^2,
+    RGRt = AGR/M,
+    RGRm = r*(1 - M/K)
+  )
+
+  rates <- rbind(rates, tmp_rates)
+}
+
+head(rates)
+
+par(mfrow=c(2,2))
+
+for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
+  tryCatch({
+      Id <- unique(new_df$group)[i]
+      a <- subset(new_df, group == Id)
+      
+      tmp <- getInitial( Y ~ SSlogis(X, Asym, xmid, scal), data = a) 
+      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start = tmp)
+      yfitted <- predict(fit, list(X = xNew))
+      
+      # "biomass"
+      plot(Y ~ X, data = a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
+      lines(xNew, yfitted, col = 'red')
+      mtext(paste(Id), font=3, padj = -1)
+      
+      b <- subset(rates, id == Id)
+      
+      # AGR
+      plot(AGR ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("AGR ", (unit^-1%.%day^-1))))
+      lines(AGR ~ times, data = b)
+      
+      # RGRt
+      plot(RGRt ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
+      lines(RGRt ~ times, data = b)
+      
+      # RGRm
+      plot(RGRm ~ M, data=b, type = "n", xlab='NDVI', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
+      lines(RGRm ~ M, data = b)
+  }, 
+  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
+  
+}
+
+```
+
+### Growth rates from 4P logistic regression
+
+Determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv") using 4P logistic fit.
+
+```{r}
 par(mfrow = c(3,3))
 
 # plot and fit to 9 random accessions
@@ -469,7 +453,9 @@ for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
 
 # logLik on last plot
 logLik(fit)
+```
 
+```{r}
 ## fit fpl on all accessions and extract coefficients based on Paine et al 2012.
 cfs_fpl <- NULL
 
@@ -504,11 +490,9 @@ par(mfrow=c(2,2))
 plot(profile(fit))
 ```
 
-> Profiles are v-shaped (also for 3P; not shown above).
+> Profiles are v-shaped
 
-#### Extract AGR and RGR using 4P fit
-
-```{r, include=FALSE}
+```{r}
 rates <- NULL
 cfs <- cfs_fpl # use 4p logistic results
 
@@ -519,7 +503,7 @@ for(i in cfs$id){
     M0 = cfs$M0[cfs$id == i],
     xmid = cfs$xmid[cfs$id == i],
     r = cfs$r[cfs$id == i],
-    times = unique(new_df$X),
+    times = xNew,
     ex = exp((xmid-times)/r),
     M  = M0+(K-M0)/(1+ex),           
     AGR  = ((K-M0)*ex)/(r*(1+ex)^2),
@@ -530,11 +514,6 @@ for(i in cfs$id){
   rates <- rbind(rates, tmp_rates)
 }
 
-```
-
-#### Take random ID and plot all data together (NDVI, RGR, AGR)
-
-```{r, results='markup'}
 head(rates, n=3)
 
 par(mfrow=c(2,2))
@@ -550,30 +529,29 @@ for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
       yfitted <- predict(fit, list(X = xNew))
       
       # "biomass"
-      plot(Y ~ X, data = a, ylab = "NDVI", xlab = "", ylim = c(0,.8))
+      plot(Y ~ X, data = a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
       lines(xNew, yfitted, col = 'red')
       mtext(paste(Id), font=3, padj = -1)
       
       b <- subset(rates, id == Id)
       
       # AGR
-      plot(AGR ~ times, data=b, type = "n", xlab='', ylab = expression(paste("AGR ", (unit^-1%.%day^-1))))
+      plot(AGR ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("AGR ", (unit^-1%.%day^-1))))
       lines(AGR ~ times, data = b)
       
       # RGRt
-      plot(RGRt ~ times, data=b, type = "n", xlab='', ylab = expression(paste("RGR ", (g%.%g^-1%.%day^-1))))
+      plot(RGRt ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
       lines(RGRt ~ times, data = b)
       
       # RGRm
-      plot(RGRm ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
-      lines(RGRm ~ times, data = b)
+      plot(RGRm ~ M, data=b, type = "n", xlab='NDVI', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
+      lines(RGRm ~ M, data = b)
   }, 
   error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
   
 }
 
 ```
-
 
 
 
