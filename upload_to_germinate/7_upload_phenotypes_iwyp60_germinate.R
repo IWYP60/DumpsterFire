@@ -64,8 +64,6 @@ dbWriteTable(conn = con, name = 'units', value = dat_unit2, row.names = NA, appe
 a <- dbReadTable(name = "units", conn=con)
 print(a)
 
-interger_dats <- c("Number of Ears")
-
 ## assemble phenotypes
 dat <- mutate(out_traits, unit_id = a$id[match(unit_abbreviation, a$unit_abbreviation)]) %>% 
   ## add full trait name and description from keyfile 

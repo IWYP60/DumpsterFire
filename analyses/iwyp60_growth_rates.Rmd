@@ -1,12 +1,12 @@
 ---
-title: "Exploring growth rates IWYP"
+title: "Determining growth rates from IWYP field trials"
 author: "A Bowerman, D Ganguly"
-date: "21/05/2019"
+date: "19/06/2019"
 output: html_document
 ---
 
 ## Aim 
-Calculate growth rates from NDVI data.
+Determine growth rates for IWYP field trials based on digital biomass (NDVI).
 
 ## Method
 Utilise measures of Normalized Vegetation Index (NDVI, Greenseeker) to estimate growth rates using a nonlinear modelling approach [Paine et al 2012](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00155.x).
@@ -120,203 +120,250 @@ Polynomial models are clearly *not* appropriate for plant growth modelling and a
 
 1. *3P logistic*
 2. *4P logistic*
-
-*N.B. Gompertz would not converge*
+3. *Gompertz*
 
 Which fitting routine to use [nls, _gnls_, or nlme]? If there are no treatment effects (ie y ~ x) use gnls. It can do everything that nls can do, but additionally allows variance modelling to deal with heteroscedasticity. Also, gnls allows you to choose which parameters should vary among treatment groups, and which should be global (Pinheiro & Bates, pg 401). However, occasionally gnls will fail to converge. In those cases, nls can still be useful. nlme can do all of the above, as well as allowing for fixed and (nested) random effects. However, it requires a somewhat different syntax for specifying the model (Pinheiro, J.C., and Bates, D.M. 2000).
 
 ```{r setup mdl data, include=FALSE}
 library(nlme)
 
+sowing_date <- tibble(dataset = c("GES18_Extras", "GES18_ExKsub"),
+                      date = c("2018-07-08", "2018-07-08"))
+                                  
 df <- dat %>%
-  rename(X=date, Y=value, group=general_identifier) %>% 
-  mutate(X_num = as.numeric(X)) %>%
-  mutate(dataset = sapply(strsplit(dataset, " "), function(l) l[1])) %>%
+  rename(X=date, Y=value, ID=general_identifier) %>%
   filter(X != "2018-11-16") %>%
-  select(Y,X,X_num,group,dataset) %>% 
-  mutate(logY = log10(Y))
-  
-df_exk <- subset(df, dataset == "GES18_ExKsub")
-df_ext <- subset(df, dataset == "GES18_Extras")
-
-n.preds=100
-r <- range(df$X_num)
-xNew <- seq(r[1],r[2],length.out = n.preds)
-```
-
-### Exploratory modelling with the 3-parameter logistic
-
-```{r}
-#fit
-fit.logis.exk  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_exk)
-yfitted.exk <- predict(fit.logis.exk, list(X_num = xNew))
-
-fit.logis.ext  <- gnls( Y ~ SSlogis(X_num, Asym, xmid, scal), data = df_ext)
-yfitted.ext <- predict(fit.logis.ext, list(X_num = xNew))
-
-par(mfrow = c(1,2))
-
-#plot
-plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Date")
-lines(xNew, yfitted.exk, col = 'red')
-mtext("GES18 ExK", font=3, padj = -1)
-
-plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Date")
-lines(xNew, yfitted.ext, col = 'red')
-mtext("GES18 Extras", font=3, padj = -1)
-
-```
-
-Visualize scaled residuals and model fits for each model.
-
-```{r, echo=FALSE}
-p3 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
-  ggtitle("3P Logistic GES18 ExK") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p4 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.logis.ext), y=residuals(fit.logis.ext)/sd(residuals(fit.logis.ext)))) +
-  ggtitle("3P Logistic GES18 Extras") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p3 + p4
-
-out <- rbind(c("Logistic exk", round(fit.logis.exk$logLik)),
-             c("Logistic ext", round(fit.logis.ext$logLik))
-)
-
-colnames(out) <- c("Model", "logLik")
-out
-```
-
-As a trial, the 3P logistic model is fitted to each dataset. It is the more commonly used form as it has a point of inflexion and is a relatively flexible and parsimonious model. We can continue modelling using the 3P logistic model with *SSlogis* to improve the model fit. We can include a dummy time-point at T=0 and see if the model converged on log10 transformed data. A 4-P logistic model gives greater flexibility and can help explain greater variance. It did not converge previously, however, the inclusion of T=0 may facilitate parsimony.
-
-```{r, include=FALSE}
-dummy <- NULL
-for(i in unique(interaction(df$group, df$dataset))){
-  a <- tibble(Y = 0, X=as.Date("2018-07-08"), 
-              logY=log10(0.01),
-              group=sapply(strsplit(i, "\\."), function(l) l[1]),
-              X_num = as.numeric(X),
-              dataset= sapply(strsplit(i, "\\."), function(l) l[2]))
-  dummy <- rbind(dummy, a)
-}
-
-## convert date to days for meaningful rates
-new_df <- rbind(dummy, df) %>%
-  mutate(days = lubridate::interval(min(X),X)) %>%
+  mutate(dataset = sapply(strsplit(dataset, " "), function(l) l[1])) %>%
+  mutate(sowing = sowing_date$date[match(dataset, sowing_date$dataset)]) %>%
+  mutate(days = lubridate::interval(sowing,X)) %>%
   mutate(days = lubridate::as.duration(days)) %>%
   mutate(days = as.numeric(days)/60/60/24) %>%
   mutate(X=days) %>%
-  select(-X_num, -days)
-
-df_exk <- subset(new_df, dataset == "GES18_ExKsub")
-df_ext <- subset(new_df, dataset == "GES18_Extras")
-
+  select(Y,X,ID,dataset) %>% 
+  mutate(logY = log10(Y))
+  
 n.preds=100
-r <- range(new_df$X)
+r <- range(df$X)
 xNew <- seq(r[1],r[2],length.out = n.preds)
 ```
 
-```{r}
-#fit
-fit.logis.exk  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_exk)
-yfitted.exk <- predict(fit.logis.exk, list(X = xNew))
+## Trial models
 
-fit.logis.ext  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext)
-yfitted.ext <- predict(fit.logis.ext, list(X = xNew))
+We can first try fitting each of the above models to the data split up by plant_plot or accession IDs. Initially, exploratory modelling was performed on the entire NDVI data, however, convergence on this data is limited using *gnls* as we do not provide a means with which to account for the huge variance of data. Thus, we model individually and get a distribution of log likelihoods, as a measure of "goodness of fit".
 
-fit.fpl.exk <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_exk)
-yfitted2.exk <- predict(fit.fpl.exk, list(X = xNew))
-
-fit.fpl.ext <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext)
-yfitted2.ext <- predict(fit.fpl.ext, list(X = xNew))
-
-par(mfrow = c(2,2))
-
-#plot
-plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Days")
-lines(xNew, yfitted.exk, col = 'red')
-mtext("3P GES18 ExK", font=3, padj = -1)
-
-plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Days")
-lines(xNew, yfitted.ext, col = 'red')
-mtext("3P GES18 Extras", font=3, padj = -1)
-
-plot(Y ~ X, df_exk, ylab = "NDVI", xlab = "Days")
-lines(xNew, yfitted2.exk, col = 'red')
-mtext("4P GES18 ExK", font=3, padj = -1)
-
-plot(Y ~ X, df_ext, ylab = "NDVI", xlab = "Days")
-lines(xNew, yfitted2.ext, col = 'red')
-mtext("4P GES18 Extras", font=3, padj = -1)
-
-```
-
-```{r, echo=FALSE}
-p1 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.logis.exk), y=residuals(fit.logis.exk)/sd(residuals(fit.logis.exk)))) +
-  ggtitle("3P GES18 ExK") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p2 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.logis.ext), y=residuals(fit.logis.ext)/sd(residuals(fit.logis.ext)))) +
-  ggtitle("3P GES18 Extras") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p3 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.fpl.exk), y=residuals(fit.fpl.exk)/sd(residuals(fit.fpl.exk)))) +
-  ggtitle("4P GES18 ExK") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p4 <- ggplot() + 
-  geom_point(aes(x=fitted(fit.fpl.ext), y=residuals(fit.fpl.ext)/sd(residuals(fit.fpl.ext)))) +
-  ggtitle("4P GES18 Extras") +
-  scale_y_continuous("Scaled residuals") + scale_x_continuous("Fitted values")
-
-p1 + p2 + p3 + p4
-
-out <- rbind(c("3P ExK", round(fit.logis.exk$logLik)),
-             c("3P Extras", round(fit.logis.ext$logLik)),
-             c("4P ExK", round(fit.fpl.exk$logLik)),
-             c("4P Extras", round(fit.fpl.ext$logLik))
-)
-
-colnames(out) <- c("Model", "logLik")
-out
-```
-
-### Growth rates from 3P logistic regression
-Determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv") using 3P logistic fit.
-
-```{r}
+```{r, 3P trial fitting}
 par(mfrow = c(3,3))
 
 # plot and fit to 9 random accessions
-for(i in sample(1:length(unique(new_df$group)), size = 9, replace = FALSE)){
-  tryCatch({
-      id <- unique(new_df$group)[i]
-      a <- subset(new_df, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
-      yfitted <- predict(fit, list(X = xNew))
-      
-      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
-      lines(xNew, yfitted, col = 'red')
-      mtext(paste(id), font=3, padj = -1)
-      
-  }, 
-  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
+for(i in sample(1:length(unique(df$ID)), size = 9, replace = FALSE)){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
   
-}
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a),
+    error=function(e) e
+  )
 
-# logLik on last plot
-logLik(fit)
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
+    yfitted <- predict(fit, list(X = xNew))
+    plot(Y ~ X, a, ylab = "NDVI", xlab = "Days since sowing", ylim = c(0,.6))
+    lines(xNew, yfitted, col = 'red')
+    mtext(paste(id), font=3, padj = -1)
+  }
+}
+  
+# get distribution of log likelihoods
+log_lik_3p <- NULL
+
+for(i in 1:length(unique(df$ID))){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+  
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
+    log_lik_3p <- rbind(logLik(fit), log_lik_3p)
+  }
+}
 
 ```
 
-> 3P logistic seems parsimonious with these datasets. Can use it to assemble coefficients for all plant plot/accessions ideas for the entire GES18 campaign. Any IDs for which the model does not converge are ignored and dropped.
+```{r, 4P trial fitting}
+par(mfrow = c(3,3))
+
+# plot and fit to 9 random accessions
+for(i in sample(1:length(unique(df$ID)), size = 9, replace = FALSE)){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+  
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial( Y ~ SSfpl(X, A, B, xmid, scal), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial( Y ~ SSfpl(X, A, B, xmid, scal), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp)
+    yfitted <- predict(fit, list(X = xNew))
+    plot(Y ~ X, a, ylab = "NDVI", xlab = "Days since sowing", ylim = c(0,.6))
+    lines(xNew, yfitted, col = 'red')
+    mtext(paste(id), font=3, padj = -1)
+  }
+}
+
+# get distribution of log likelihoods
+log_lik_4p <- NULL
+
+for(i in 1:length(unique(df$ID))){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+  
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial( Y ~ SSfpl(X, A, B, xmid, scal), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial( Y ~ SSfpl(X, A, B, xmid, scal), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp)
+    log_lik_4p <- rbind(logLik(fit), log_lik_4p)
+  }
+}
+```
+
+```{r, Gompertz trial fitting}
+par(mfrow = c(3,3))
+
+# plot and fit to 9 random accessions
+for(i in sample(1:length(unique(df$ID)), size = 9, replace = FALSE)){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+  
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp)
+    yfitted <- predict(fit, list(X = xNew))
+    plot(Y ~ X, a, ylab = "NDVI", xlab = "Days since sowing", ylim = c(0,.6))
+    lines(xNew, yfitted, col = 'red')
+    mtext(paste(id), font=3, padj = -1)
+  }
+}
+
+# get distribution of log likelihoods
+log_lik_gom <- NULL
+
+for(i in 1:length(unique(df$ID))){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+  
+  # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp)
+    log_lik_gom <- rbind(logLik(fit), log_lik_gom)
+  }
+}
+
+```
+
+Compare log-likelihoods across all models
+
+```{r}
+log_p1 <- ggplot() +  geom_histogram(aes(x=log_lik_3p), bins=10, fill='lightblue') + ggtitle("3P logistic") + scale_x_continuous("Log Likelihood") + coord_cartesian(ylim = c(0,200), xlim = c(0,100))
+
+log_p2 <- ggplot() +  geom_histogram(aes(x=log_lik_4p), fill='salmon', bins=10) + ggtitle("4P logistic") + scale_x_continuous("Log Likelihood") + coord_cartesian(ylim = c(0,200), xlim = c(0,100))
+
+log_p3 <- ggplot() +  geom_histogram(aes(x=log_lik_gom), fill='forestgreen', bins=10) + ggtitle("Gompertz") + scale_x_continuous("Log Likelihood") + coord_cartesian(ylim = c(0,200), xlim = c(0,100))
+
+log_p1 + log_p2 + log_p3
+```
+
+> All models appear to perform similarly, however, 4P is extremely limited on convergence. 3P and Gompertz perform almost identically.
+> Gompertz may be more appropriate as it does not rely on a constant growth rate over time/biomass, whereas 3P-logistic does. Therefore, continue with Gompertz.
+
+### Parameter transformation equations
 
 ```{r}
 # transform paramters of 3P logistic model
@@ -333,18 +380,50 @@ transform_param.logis <- function(coef){
 	return(out)
 }
 
+# transform parameters of Gompertz model
+transform_param.gomp <- function(coef){
+	K  <- coef[1]
+	M0 <- K/exp(coef[2])
+	r  <- -log(coef[3])
+	out <- c(K, r, M0)
+	names(out) <- c("K", "r", "M0")
+	return(out)
+}
+```
+
+## Calculation of growth rates
+Determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv").
+
+```{r}
 cfs_logis <- NULL
 
-for(i in 1:length(unique(new_df$group))){
-  tryCatch({
-      id <- unique(new_df$group)[i]
-      a <- subset(new_df, group == id)
-      tmp <- getInitial(Y ~ SSlogis(X, Asym, xmid, scal), data = a)
-      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start=tmp)
-      x <- transform_param.logis(coef(fit))
-      tmp2 <- tibble(id = id, K=x[1], r=x[2], M0 = x[3])
-      cfs_logis <- rbind(cfs_logis, tmp2)
-  }, error = function(e) {})
+for(i in 1:length(unique(df$ID))){
+  id <- unique(df$ID)[i]
+  a <- subset(df, ID == id)
+
+    # ERROR HANDLING for initial fit
+  possibleError <- tryCatch(
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a),
+    error=function(e) e
+  )
+
+  if(!inherits(possibleError, "error")){
+    tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a)
+  }
+  
+  # ERROR HANDLING for final fit
+  possibleError <- tryCatch(
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp),
+    error=function(e) e
+  )
+  
+  if(!inherits(possibleError, "error")){
+    #REAL WORK
+    fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp)
+    x <- transform_param.gomp(coef(fit))
+    tmp2 <- tibble(id = id, K=x[1], r=x[2], M0 = x[3])
+    cfs_logis <- rbind(cfs_logis, tmp2)
+  }
 }
 
 p1 <- ggplot(data = cfs_logis) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
@@ -353,24 +432,14 @@ p3 <- ggplot(data = cfs_logis) + geom_histogram(aes(x=M0), fill = "goldenrod", c
 
 p1 + p2 + p3
 
+output_gomp <- cfs_logis %>% mutate(trial = df$dataset[match(id, df$ID)])
+write_csv(output_gomp, "NLS_Gompertz_parameters.csv")
+  
 ```
-
-Check that the parameter profiles are approximately V-shaped (and that the sampling intervals of the parameters are therefore approximately multivariate normal) before proceeding.
-
-```{r}
-tmp <- getInitial( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext)
-fit  <- nls( Y ~ SSlogis(X, Asym, xmid, scal), data = df_ext, start=tmp)
-
-par(mfrow=c(2,2))
-
-plot(profile(fit))
-```
-
-> Profiles are V-shaped
 
 ```{r}
 rates <- NULL
-cfs <- cfs_logis # use 3p logistic results
+cfs <- cfs_logis 
 
 for(i in cfs$id){
   tmp_rates <- tibble(
@@ -378,27 +447,32 @@ for(i in cfs$id){
     K = cfs$K[cfs$id == i],
     M0 = cfs$M0[cfs$id == i],
     r = cfs$r[cfs$id == i],
+    
     times = xNew,
-    M  = (M0*K)/(M0+(K-M0)*exp(-r*times)),           
-    AGR  = (r*M0*K*(K-M0)*exp(-r*times))/(M0+(K-M0)*exp(-r*times))^2,
+    M  = K*((M0/K)^exp(-r*times)),           
+    AGR  = r*K*exp(-r*times)*log(K/M0)*(M0/K)^exp(-r*times),
+  
     RGRt = AGR/M,
-    RGRm = r*(1 - M/K)
+    RGRm = r*log(K/M)
   )
 
   rates <- rbind(rates, tmp_rates)
 }
 
+## growth rate examples
 head(rates)
 
+write_csv(rates, "NLS_Gompertz_growth_rates.csv")
+
 par(mfrow=c(2,2))
 
-for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
+for(i in sample(1:length(unique(rates$id)), size = 4, replace = FALSE)){
   tryCatch({
-      Id <- unique(new_df$group)[i]
-      a <- subset(new_df, group == Id)
+      Id <- unique(df$ID)[i]
+      a <- subset(df, ID == Id)
       
-      tmp <- getInitial( Y ~ SSlogis(X, Asym, xmid, scal), data = a) 
-      fit  <- gnls( Y ~ SSlogis(X, Asym, xmid, scal), data = a, start = tmp)
+      tmp <- getInitial( Y ~ SSgompertz(X, Asym, b2, b3), data = a) 
+      fit  <- gnls( Y ~ SSgompertz(X, Asym, b2, b3), data = a, start = tmp)
       yfitted <- predict(fit, list(X = xNew))
       
       # "biomass"
@@ -425,133 +499,3 @@ for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
 }
 
 ```
-
-### Growth rates from 4P logistic regression
-
-Determine AGR, RGRm, and RGRt *per plot* (ie. using plot IDs = "_IW_P_XYZv") using 4P logistic fit.
-
-```{r}
-par(mfrow = c(3,3))
-
-# plot and fit to 9 random accessions
-for(i in sample(1:length(unique(df_ext$group)), size = 9, replace = FALSE)){
-  tryCatch({
-      id <- unique(df_ext$group)[i]
-      a <- subset(df_ext, group == id)
-      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
-      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      yfitted <- predict(fit, list(X = xNew))
-      
-      plot(Y ~ X, a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
-      lines(xNew, yfitted, col = 'red')
-      mtext(paste(id), font=3, padj = -1)
-      
-  }, 
-  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
-  
-}
-
-# logLik on last plot
-logLik(fit)
-```
-
-```{r}
-## fit fpl on all accessions and extract coefficients based on Paine et al 2012.
-cfs_fpl <- NULL
-
-for(i in 1:length(unique(new_df$group))){
-  tryCatch({
-      id <- unique(new_df$group)[i]
-      a <- subset(new_df, group == id)
-      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
-      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      x <- coef(fit)
-      tmp2 <- tibble(id = id, M0=x[1], K=x[2], xmid=x[3], r = x[4])
-      cfs_fpl <- rbind(cfs_fpl, tmp2)
-  }, error = function(e) {})
-}
-
-p1 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=K), fill = "salmon", colour='black')
-p2 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=r), fill = "dodgerblue", colour='black')
-p4 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=xmid), fill = "forestgreen", colour='black')
-p3 <- ggplot(data = cfs_fpl) + geom_histogram(aes(x=M0), fill = "goldenrod", colour='black')
-
-p1 + p2 + p4 + p3
-```
-
-Before trying to make predictions, we also want to make sure we can propagate error in parameter estimates into growth rate estimates. Before propagating error, we need to check that the parameter profiles are approximately V-shaped (and that the sampling intervals of the parameters are therefore approximately multivariate normal) before proceeding.
-
-```{r}
-tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext)
-fit  <- nls( Y ~ SSfpl(X, A, B, xmid, scal), data = df_ext, start=tmp)
-
-par(mfrow=c(2,2))
-
-plot(profile(fit))
-```
-
-> Profiles are v-shaped
-
-```{r}
-rates <- NULL
-cfs <- cfs_fpl # use 4p logistic results
-
-for(i in cfs$id){
-  tmp_rates <- tibble(
-    id = i,
-    K = cfs$K[cfs$id == i],
-    M0 = cfs$M0[cfs$id == i],
-    xmid = cfs$xmid[cfs$id == i],
-    r = cfs$r[cfs$id == i],
-    times = xNew,
-    ex = exp((xmid-times)/r),
-    M  = M0+(K-M0)/(1+ex),           
-    AGR  = ((K-M0)*ex)/(r*(1+ex)^2),
-    RGRt = AGR/M,
-    RGRm = ((M0-M)*(K-M))/(r*M*(M0-K))
-  )
-
-  rates <- rbind(rates, tmp_rates)
-}
-
-head(rates, n=3)
-
-par(mfrow=c(2,2))
-
-# plot and fit to 9 random accessions
-for(i in sample(1:length(unique(rates$id)), size = 2, replace = FALSE)){
-  tryCatch({
-      Id <- unique(new_df$group)[i]
-      a <- subset(new_df, group == Id)
-      
-      tmp <- getInitial(Y ~ SSfpl(X, A, B, xmid, scal), data = a) #4p logistic
-      fit  <- gnls( Y ~ SSfpl(X, A, B, xmid, scal), data = a, start = tmp) #4p logistic
-      yfitted <- predict(fit, list(X = xNew))
-      
-      # "biomass"
-      plot(Y ~ X, data = a, ylab = "NDVI", xlab = "Days", ylim = c(0,.8))
-      lines(xNew, yfitted, col = 'red')
-      mtext(paste(Id), font=3, padj = -1)
-      
-      b <- subset(rates, id == Id)
-      
-      # AGR
-      plot(AGR ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("AGR ", (unit^-1%.%day^-1))))
-      lines(AGR ~ times, data = b)
-      
-      # RGRt
-      plot(RGRt ~ times, data=b, type = "n", xlab='Days', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
-      lines(RGRt ~ times, data = b)
-      
-      # RGRm
-      plot(RGRm ~ M, data=b, type = "n", xlab='NDVI', ylab = expression(paste("RGR ", (unit%.%unit^-1%.%day^-1))))
-      lines(RGRm ~ M, data = b)
-  }, 
-  error = function(e){cat("ERROR @ #", i, ":", conditionMessage(e), "\n")})
-  
-}
-
-```
-
-
-
