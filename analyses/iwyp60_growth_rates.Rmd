@@ -448,6 +448,7 @@ for(i in cfs$id){
     M0 = cfs$M0[cfs$id == i],
     r = cfs$r[cfs$id == i],
     
+    ## Gompertz calcs
     times = xNew,
     M  = K*((M0/K)^exp(-r*times)),           
     AGR  = r*K*exp(-r*times)*log(K/M0)*(M0/K)^exp(-r*times),
