@@ -50,7 +50,9 @@ dbWriteTable(conn = con, name = 'grouptypes', value = w, row.names = NA, append 
 w <- dbReadTable(name = "grouptypes", conn=con)
 print(w)
 
-### collate all panels to add as "groups"
+
+######### 
+### ADD PANEL "groups"
 grp_panel <- select(site_accessions, ID, Panel) %>%
   mutate(name = Panel) %>%
   mutate(description = "Accession panel") %>%
@@ -69,7 +71,10 @@ dbWriteTable(conn = con, name = 'groups', value = grp_panel, row.names = NA, app
 a <- dbReadTable(name = "groups", conn=con)
 print(a)
 
-## collate locations to add as "groups"
+
+#################
+######
+## ADD LOCATION "groups"
 grp_locs <- select(site_accessions, file) %>%
   mutate(year = sapply(strsplit(file, "_"), function(l) l[1])) %>%
   mutate(name = sapply(strsplit(file, "_"), function(l) l[2])) %>%
@@ -93,7 +98,9 @@ dbWriteTable(conn = con, name = 'groups', value = grp_locs, row.names = NA, appe
 a <- dbReadTable(name = "groups", conn=con)
 print(a)
 
-## collate panel members
+##########
+#####
+## ADD PANEL GROUPMEMBERS
 grp_panel_members <- mutate(site_accessions, germinatebase_id = tables$germinatebase$id[match(ID,tables$germinatebase$general_identifier)]) %>%
   mutate(germinatebase_id = ifelse(is.na(germinatebase_id) == TRUE, yes =
                                     tables$germinatebase$id[match(ID, tables$germinatebase$name)], no = germinatebase_id)) %>%
@@ -112,7 +119,9 @@ dbWriteTable(conn = con, name = 'groupmembers', value = grp_panel_members, row.n
 b <- dbReadTable(name = "groupmembers", conn=con)
 print(b)
 
-### locations group members
+##########
+#####
+## ADD LOCATION GROUPMEMBERS
 grp_locs_members <- select(site_accessions, file) %>%
   mutate(year = sapply(strsplit(file, "_"), function(l) l[1])) %>%
   mutate(name = sapply(strsplit(file, "_"), function(l) l[2])) %>%
@@ -129,6 +138,65 @@ grp_locs_members <- subset(grp_locs_members, !(foreign_id %in% tables$groupmembe
 
 ## APPEND DATA TO TABLE
 dbWriteTable(conn = con, name = 'groupmembers', value = grp_locs_members, row.names = NA, append = TRUE)
+
+## check updated table
+b <- dbReadTable(name = "groupmembers", conn=con)
+print(b)
+
+################### GENOTYPING
+##########
+### collate GBS collection to add as "groups"
+traits <- c("GBS")
+
+## subset to files that contains Panel info
+gbs <- dir(iwyp_dir, "csv") %>% 
+  tibble %>% 
+  mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
+  mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
+  filter(datatype %in% traits) %>%
+  mutate(contents = map(., ~read_csv(file.path(iwyp_dir, .), skip=5, col_names = T))) %>%
+  unnest %>%
+  mutate(Panel = sapply(strsplit(., "_"), function(l) l[3])) %>%
+  select(AlleleID, Panel) %>%
+  mutate(name = paste(Panel, 'GBS')) %>%
+  mutate(description = "Genotyping dataset") %>%
+  mutate(visibility = 1) %>%
+  mutate(grouptype_id = 2) %>% ## grouptype 2 = markers
+  select(name, description, visibility, grouptype_id) %>%
+  unique
+
+# filter pre-existing entries
+gbs <- subset(gbs, !(name %in% tables$groups$name))
+
+## APPEND DATA TO TABLE
+dbWriteTable(conn = con, name = 'groups', value = gbs, row.names = NA, append = TRUE)
+
+## check updated table
+a <- dbReadTable(name = "groups", conn=con)
+print(a)
+
+#############
+#####
+## ADD MARKER/GENOTYPING GROUPMEMBERS
+gbs_members <- dir(iwyp_dir, "csv") %>% 
+  tibble %>% 
+  mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
+  mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
+  filter(datatype %in% traits) %>%
+  mutate(contents = map(., ~read_csv(file.path(iwyp_dir, .), skip=5, col_names = T))) %>%
+  unnest %>%
+  mutate(Panel = sapply(strsplit(., "_"), function(l) l[3])) %>%
+  mutate(name = paste(Panel, 'GBS')) %>%
+  mutate(marker_id = tables$markers$id[match(AlleleID, tables$markers$marker_name)]) %>%
+  mutate(group_id = a$id[match(name, a$name)]) %>%
+  mutate(foreign_id = marker_id) %>%
+  select(foreign_id, group_id) %>%
+  unique
+
+gbs_members <- subset(gbs_members, !(foreign_id %in% tables$groupmembers$foreign_id))
+
+## APPEND DATA TO TABLE
+dbWriteTable(conn = con, name = 'groupmembers', value = gbs_members, row.names = NA, append = TRUE)
 
 ## check updated table
 b <- dbReadTable(name = "groupmembers", conn=con)

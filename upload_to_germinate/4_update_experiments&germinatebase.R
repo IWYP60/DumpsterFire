@@ -10,6 +10,7 @@ library(tidyverse)
 iwyp_dir <- "iwyp60_data/"
 trials <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
 comps <- c('Metabolomics-metabolite', 'Proteomics-functionalbin', 'Proteomics-peptide')
+gbs <- "GBS"
 
 ## connect to database
 con <- dbConnect(MySQL(),
@@ -30,9 +31,7 @@ comp_fls <- dir(iwyp_dir, "csv") %>% tibble %>%
   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
   filter(datatype %in% comps)
 
-## collate ids for experimenttype compoud 
-## This may useful later to link sample ID within compound datasets to germinatebase
-
+## collate ids for experimenttype compound 
 comp_ids <- NULL
 
 for(i in comp_fls$.){
@@ -66,6 +65,50 @@ dbWriteTable(conn = con, name = 'experiments', value = r2, row.names = NA, appen
 ## check updated table
 r3 <- dbReadTable(name = "experiments", conn=con)
 print(r3)
+
+#################
+#########
+### genotyping experiments
+# comp_fls <- dir(iwyp_dir, "csv") %>% tibble %>% 
+#   mutate(datatype = sapply(strsplit(., "_"), function(l) l[4])) %>%
+#   mutate(datatype = sapply(strsplit(datatype, ".csv"), function(l) l[1])) %>%
+#   filter(datatype %in% gbs)
+# 
+# ## collate ids for genotyping
+# gbs_ids <- NULL
+# 
+# for(i in comp_fls$.){
+#   a <- read_csv(file.path(iwyp_dir, i), skip=5, col_names = T) %>%
+#     select("AlleleID", "Chrom_Wheat_ChineseSpring04", "ChromPos_Wheat_ChineseSpring04", "SNP", "SnpPosition") %>%
+#     mutate(Chrom_Wheat_ChineseSpring04 = ifelse(test = is.na(Chrom_Wheat_ChineseSpring04) == T, 
+#                                                 yes = "Unmapped", 
+#                                                 no = Chrom_Wheat_ChineseSpring04)) %>%
+#     mutate(experiment_name = sapply(strsplit(i, "_"), function(l) paste0(l[2],l[1], " ", l[3]))) %>%
+#     mutate(type = sapply(strsplit(i, "_"), function(l) l[4])) %>%
+#     mutate(type = sapply(strsplit(type, ".csv"), function(l) l[1]))
+#   
+#   gbs_ids <- rbind(a, gbs_ids)
+# }
+# 
+# r <- select(gbs_ids, experiment_name, type) %>% unique %>%
+#   mutate(description = paste(description,type,sep=' ')) %>%
+#   
+#   mutate(experiment_id = as.integer(row_number()+22)) %>%
+#   mutate(experiment_name = ifelse(experiment_id > 10, 
+#                                   yes=paste0("IW_E00",experiment_id),
+#                                   no=paste0("IW_E000",experiment_id))) %>%
+#   mutate(experiment_type_id = as.integer(6)) %>% # compound = 'experimenttypes$id' == 6
+#   mutate(experiment_date = ' ') %>%
+#   select(experiment_name, description, experiment_type_id)
+# 
+# r2 <- subset(r, !(description %in% tables$experiments$description))
+# 
+# ## append experiments table
+# dbWriteTable(conn = con, name = 'experiments', value = r2, row.names = NA, append = TRUE)
+# 
+# ## check updated table
+# r3 <- dbReadTable(name = "experiments", conn=con)
+# print(r3)
 
 #################
 ###

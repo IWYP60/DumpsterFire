@@ -8,7 +8,7 @@ library(tidyverse)
 
 #### collate data
 iwyp_dir <- "iwyp60_data/"
-traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE")
+traits <- c("Harvest", "Lidar", "Biomass", "ASD", "Q2", "Physiology-Raw", "Physiology-BLUE", "GBS")
 compound_sets <- c('Metabolomics-metabolite', 'Proteomics-functionalbin', 'Proteomics-peptide')
 
 ## subset csv files
